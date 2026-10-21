@@ -9,6 +9,8 @@
 // cyan reserved for data headers, and a cut corner so the panel is cockpit
 // hardware rather than a web rectangle.
 
+import { partsForStation, shipsForStation, canCommission, commissionShip, installPart, rankName, rankIndex, RANKS, careerPoints, nextRank } from './career.js';
+
 const TITLE = 'IRIDIUM REACH';
 const FRANCHISE = 'STAR TREK';
 const LS_KEY = 'iridium-reach.settings';
@@ -362,6 +364,17 @@ export function initUI(G) {
 }
 #ir-ui .ir-wallet b { font-size: 22px; letter-spacing: 0.08em; color: #ffcc99; }
 #ir-ui .ir-shop { display: flex; flex-direction: column; gap: 8px; }
+#ir-ui #ir-dock .ir-body { max-height: calc(100vh - 220px); overflow-y: auto; padding-right: 8px; }
+#ir-ui .ir-dock-sec { margin-top: 12px; }
+#ir-ui .ir-dock-sec h4 {
+  margin: 0 0 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(153,204,255,0.35);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.28em; color: #99ccff; text-transform: uppercase;
+}
+#ir-ui .ir-brief {
+  margin-top: 10px; padding: 9px 12px; border-left: 5px solid #99ccff;
+  background: rgba(153,204,255,0.08); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.14em; line-height: 1.45; color: rgba(255,204,153,0.82); text-transform: uppercase;
+}
 #ir-ui .ir-item {
   display: flex; align-items: center; gap: 16px;
   padding: 10px 12px 10px 16px; border-left: 5px solid #ff9c00;
@@ -523,9 +536,14 @@ export function initUI(G) {
         <div class="ir-sub" id="ir-dock-sub">NO HOSTILES &middot; REPAIR AND REQUISITION</div>
         <div class="ir-rule"></div>
         <div class="ir-wallet" id="ir-dock-wallet"><span>REQUISITION CREDITS</span><b id="ir-dock-credits">0</b></div>
-        <div class="ir-shop" id="ir-dock-shop"></div>
+        <div class="ir-brief" id="ir-dock-brief"></div>
+        <div class="ir-dock-sec hidden" id="ir-dock-assign-sec"><h4>ASSIGNMENT BOARD</h4><div class="ir-shop" id="ir-dock-offers"></div></div>
+        <div class="ir-dock-sec hidden" id="ir-dock-parts-sec"><h4>STARBASE REQUISITIONS</h4><div class="ir-shop" id="ir-dock-parts"></div></div>
+        <div class="ir-dock-sec hidden" id="ir-dock-ships-sec"><h4>SHIPYARD</h4><div class="ir-shop" id="ir-dock-ships"></div></div>
+        <div class="ir-dock-sec hidden" id="ir-dock-nav-sec"><h4>NAVIGATION · SELECT COURSE</h4><div class="ir-shop" id="ir-dock-nav"></div></div>
+        <div class="ir-dock-sec"><h4>PORT SERVICES</h4><div class="ir-shop" id="ir-dock-shop"></div></div>
         <div class="ir-rule"></div>
-        <button class="ir-btn primary" id="ir-dock-depart"><i>&#8250;&#8250;</i>DEPART &middot; JUMP TO NEXT SECTOR</button>
+        <button class="ir-btn primary" id="ir-dock-depart"><i>&#8250;&#8250;</i>DEPART &middot; JUMP TO COURSE</button>
         <button class="ir-btn" id="ir-dock-undock"><i>&#8250;&#8250;</i>RETURN TO CONN</button>
         <div class="ir-foot"><b>A / ENTER</b> BUY &middot; <b>B / ESC</b> RETURN &middot; <b>Y</b> DEPART</div>
       </div>
@@ -676,7 +694,7 @@ export function initUI(G) {
 
   // in-fiction context line from the game's own procedural names
   el('ir-shipline').textContent =
-    `${G.names.ship} · ${G.names.shipClass} CLASS · ${G.names.system}`.toUpperCase();
+    `${G.names.ship} · ${G.names.shipClass} CLASS · ${rankName(G)} · ${G.names.system}`.toUpperCase();
   // persistent flight record (localStorage high score)
   const bootHS = readHighScore();
   el('ir-bestline').textContent = bootHS > 0 ? `BEST STARFLEET RECORD ${fmt(bootHS)}` : 'NO FLIGHT RECORD ON FILE';
@@ -857,56 +875,203 @@ export function initUI(G) {
 
   // ---------------- safe haven / port ----------------
   let dockFocus = 0;
-  function paintDock() {
-    if (!G.station) return;
+  let dockActions = [];
+  const dockBrief = el('ir-dock-brief');
+  const dockOffers = el('ir-dock-offers');
+  const dockParts = el('ir-dock-parts');
+  const dockShips = el('ir-dock-ships');
+  const dockNav = el('ir-dock-nav');
+  const dockAssignSec = el('ir-dock-assign-sec');
+  const dockPartsSec = el('ir-dock-parts-sec');
+  const dockShipsSec = el('ir-dock-ships-sec');
+  const dockNavSec = el('ir-dock-nav-sec');
+
+  function spendCredits(cost) {
     const credits = Math.max(0, Math.round(G.player.credits || 0));
-    dockKind.textContent = G.station.label || 'SAFE HAVEN';
-    dockName.textContent = (G.station.planetName || 'FRIENDLY WORLD').toUpperCase();
-    dockSub.textContent = 'NO HOSTILES \u00b7 REPAIR AND REQUISITION';
-    dockCredits.textContent = fmt(credits);
-    dockWallet.classList.toggle('poor', credits < 80);
-    dockShop.innerHTML = SHOP_ITEMS.map((item, i) => {
-      const ready = item.can() && credits >= item.cost;
-      const max = !item.can();
-      const label = max ? (item.id === 'hull' || item.id === 'shield' ? 'FULL' : 'MAX') : `${fmt(item.cost)} CR`;
-      return `<div class="ir-item${ready ? '' : ' off'}${i === dockFocus ? ' focus' : ''}" data-item="${item.id}">
-        <div class="ir-copy"><div class="ir-name">${item.name}</div><div class="ir-desc">${item.desc()}</div></div>
-        <button class="ir-buy" data-buy="${item.id}"${ready ? '' : ' disabled'}>${label}</button>
-      </div>`;
-    }).join('');
-    dockShop.querySelectorAll('[data-buy]').forEach((btn) => {
+    if (credits < cost) return false;
+    G.player.credits = credits - cost;
+    G.telemetryData.credits = G.player.credits;
+    G.telemetryData.creditsSpent += cost;
+    return true;
+  }
+
+  function buildDockActions() {
+    const credits = Math.max(0, Math.round(G.player.credits || 0));
+    const m = G.missions;
+    const rank = rankIndex(G);
+    const groups = { debrief: [], offers: [], parts: [], ships: [], nav: [], services: [] };
+
+    if (m && m.contract && m.contract.status === 'debrief' && m.contract.issuerSystem === G.systemIndex) {
+      groups.debrief.push({
+        kind: 'debrief', name: 'CLOSE ASSIGNMENT', cost: 0, ready: true,
+        desc: `${m.contract.title} · ${m.contract.stages.length} STAGES COMPLETE`,
+        label: `+${fmt(m.contract.score)} SCORE · +${fmt(m.contract.credits)} CR`,
+      });
+    }
+
+    if (m && !m.contract) {
+      for (let i = 0; i < m.offers.length; i++) {
+        const off = m.offers[i];
+        groups.offers.push({
+          kind: 'offer', index: i, name: off.title, cost: 0, ready: true,
+          desc: `${off.blurb} · ${off.targetNames.join(' > ')} · +${fmt(off.score)} SCORE · +${fmt(off.credits)} CR`,
+          label: 'ACCEPT',
+        });
+      }
+    }
+
+    for (const part of partsForStation(G)) {
+      groups.parts.push({
+        kind: 'part', id: part.id, name: part.name, desc: part.desc,
+        cost: part.cost, ready: credits >= part.cost, label: `${fmt(part.cost)} CR`,
+      });
+    }
+
+    for (const def of shipsForStation(G)) {
+      const owned = G.career && G.career.ownedShips.has(def.id);
+      const rankOk = def.minRank <= rank;
+      const cost = owned ? 0 : def.cost;
+      groups.ships.push({
+        kind: 'ship', id: def.id,
+        name: `${def.name} · ${def.className}`,
+        desc: owned ? 'OWNED · READY TO RECOMMISSION' : def.blurb,
+        cost, ready: canCommission(G, def.id) && (owned || credits >= cost),
+        label: !rankOk ? `RANK ${RANKS[def.minRank].name}` : `${fmt(cost)} CR`,
+      });
+    }
+
+    if (!m || !m.contract) {
+      const seen = new Set();
+      for (const delta of [-2, -1, 1, 2, 3]) {
+        const sys = G.systemIndex + delta;
+        if (sys < 0 || sys === G.systemIndex || seen.has(sys)) continue;
+        seen.add(sys);
+        const rec = G.ensureSystem(sys);
+        const current = G.travelTarget === sys;
+        groups.nav.push({
+          kind: 'course', system: sys,
+          name: `SECTOR ${sys + 1} · ${rec.area.toUpperCase()}`,
+          desc: `${rec.safe ? 'SAFE HAVEN · STARBASE' : 'HOSTILE SPACE · PATROL RISK'}${current ? ' · COURSE SET' : ''}`,
+          cost: 0, ready: !current, label: current ? 'SET' : 'COURSE',
+        });
+      }
+    }
+
+    for (const item of SHOP_ITEMS) {
+      groups.services.push({
+        kind: 'service', id: item.id, name: item.name, desc: item.desc(),
+        cost: item.cost, ready: item.can() && credits >= item.cost,
+        label: !item.can() ? (item.id === 'hull' || item.id === 'shield' ? 'FULL' : 'MAX') : `${fmt(item.cost)} CR`,
+      });
+    }
+
+    const all = [...groups.debrief, ...groups.offers, ...groups.parts, ...groups.ships, ...groups.nav, ...groups.services];
+    all.forEach((a, i) => { a.idx = i; });
+    return { all, groups };
+  }
+
+  function renderActions(host, actions) {
+    host.innerHTML = actions.map((a) => `<div class="ir-item${a.ready ? '' : ' off'}${a.idx === dockFocus ? ' focus' : ''}" data-row="${a.idx}">
+      <div class="ir-copy"><div class="ir-name">${a.name}</div><div class="ir-desc">${a.desc}</div></div>
+      <button class="ir-buy" data-do="${a.idx}"${a.ready ? '' : ' disabled'}>${a.label}</button>
+    </div>`).join('');
+    host.querySelectorAll('[data-do]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        buyDockItem(btn.dataset.buy);
+        runDockAction(Number(btn.dataset.do));
       });
     });
   }
 
-  function buyDockItem(id) {
-    const item = SHOP_ITEMS.find((it) => it.id === id);
-    if (!item || !item.can()) return false;
+  function paintDock() {
+    if (!G.station) return;
     const credits = Math.max(0, Math.round(G.player.credits || 0));
-    if (credits < item.cost) return false;
-    if (item.buy() === false) return false;
-    G.player.credits = credits - item.cost;
-    G.telemetryData.credits = G.player.credits;
-    G.telemetryData.creditsSpent += item.cost;
+    const sb = G.station.starbase;
+    const m = G.missions;
+    const next = nextRank(G);
+    dockKind.textContent = sb ? `${sb.id} · ${sb.name.toUpperCase()}` : (G.station.label || 'SAFE HAVEN');
+    dockName.textContent = (G.station.planetName || 'FRIENDLY WORLD').toUpperCase();
+    dockSub.textContent = `RANK ${rankName(G)} · ${careerPoints(G)} CAREER PTS${next ? ` · NEXT ${next.name} AT ${next.points}` : ' · FLAG RANK'}`;
+    dockCredits.textContent = fmt(credits);
+    dockWallet.classList.toggle('poor', credits < 80);
+
+    const c = m && m.contract;
+    if (c && c.status === 'debrief') {
+      dockBrief.textContent = `DEBRIEF READY · ${c.title} · +${fmt(c.score)} SCORE · +${fmt(c.credits)} CR`;
+    } else if (c && c.status === 'return') {
+      dockBrief.textContent = `RETURN TO ${c.issuerName} TO CLOSE ${c.title}`;
+    } else if (c && c.status === 'travel') {
+      const stage = c.stages[c.stageIndex];
+      dockBrief.textContent = `ACTIVE ASSIGNMENT · ${c.title} · STAGE ${c.stageIndex + 1}/${c.stages.length} · NEXT ${G.ensureSystem(stage.system).area.toUpperCase()}`;
+    } else if (G.travelTarget != null) {
+      dockBrief.textContent = `COURSE SET · SECTOR ${G.travelTarget + 1} · ${G.ensureSystem(G.travelTarget).area.toUpperCase()}`;
+    } else {
+      dockBrief.textContent = (m && m.lastDebrief) || 'ASSIGNMENT BOARD OPEN · SELECT A CONTRACT OR REQUISITION';
+    }
+
+    const built = buildDockActions();
+    dockActions = built.all;
+    if (dockFocus >= dockActions.length) dockFocus = Math.max(0, dockActions.length - 1);
+
+    const assignCount = built.groups.debrief.length + built.groups.offers.length;
+    dockAssignSec.classList.toggle('hidden', assignCount === 0);
+    dockPartsSec.classList.toggle('hidden', built.groups.parts.length === 0);
+    dockShipsSec.classList.toggle('hidden', built.groups.ships.length === 0);
+    dockNavSec.classList.toggle('hidden', built.groups.nav.length === 0);
+    renderActions(dockOffers, [...built.groups.debrief, ...built.groups.offers]);
+    renderActions(dockParts, built.groups.parts);
+    renderActions(dockShips, built.groups.ships);
+    renderActions(dockNav, built.groups.nav);
+    renderActions(dockShop, built.groups.services);
+  }
+
+  function runDockAction(index) {
+    const a = dockActions[index];
+    if (!a || !a.ready) return false;
+    const credits = Math.max(0, Math.round(G.player.credits || 0));
+    if (a.kind === 'debrief') {
+      if (!G.missions.completeContract()) return false;
+    } else if (a.kind === 'offer') {
+      if (!G.missions.acceptOffer(a.index)) return false;
+    } else if (a.kind === 'part') {
+      if (credits < a.cost || !installPart(G, a.id)) return false;
+      spendCredits(a.cost);
+    } else if (a.kind === 'ship') {
+      const owned = G.career && G.career.ownedShips.has(a.id);
+      if (!canCommission(G, a.id) || (!owned && credits < a.cost)) return false;
+      if (!commissionShip(G, a.id)) return false;
+      if (a.cost) spendCredits(a.cost);
+    } else if (a.kind === 'course') {
+      if (!G.setCourse(a.system)) return false;
+    } else if (a.kind === 'service') {
+      const item = SHOP_ITEMS.find((it) => it.id === a.id);
+      if (!item || !item.can() || credits < item.cost) return false;
+      if (item.buy() === false) return false;
+      spendCredits(item.cost);
+    }
+    if (G.audio && G.audio.chime) G.audio.chime();
     paintDock();
     paintScoreHud();
+    paintMission();
     return true;
+  }
+
+  function buyDockItem(id) {
+    const a = dockActions.find((it) => it.kind === 'service' && it.id === id);
+    return a ? runDockAction(a.idx) : false;
   }
 
   function moveDockFocus(delta) {
     if (G.uiState !== 'docked') return false;
-    dockFocus = (dockFocus + delta + SHOP_ITEMS.length) % SHOP_ITEMS.length;
+    if (!dockActions.length) return false;
+    dockFocus = (dockFocus + delta + dockActions.length) % dockActions.length;
     paintDock();
     return true;
   }
 
   function buyFocused() {
     if (G.uiState !== 'docked') return false;
-    const item = SHOP_ITEMS[dockFocus];
-    return item ? buyDockItem(item.id) : false;
+    return runDockAction(dockFocus);
   }
 
   function openDock() {

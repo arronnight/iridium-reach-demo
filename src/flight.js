@@ -715,6 +715,15 @@ export function initFlight(G) {
   player.phaserCalibration = 0;
   player.phaserDamageMul = 1;
   player.credits = 0;
+  player.speedMul = 1;
+  player.damageTakenMul = 1;
+  player.shipPhaserMul = 1;
+  player.partPhaserMul = 1;
+  player.shipTorpedoMul = 1;
+  player.partTorpedoMul = 1;
+  player.shieldRegenRate = 14;
+  player.shieldRegenDelay = 5;
+  player.hullRegenRate = 0;
 
   // ================= cannon heat upgrade (r15) =================
   // THE PROBLEM, in Jason's words: the photon cannon overheats too fast in
@@ -1503,7 +1512,7 @@ export function initFlight(G) {
       .addScaledVector(_fwd, 3);
     const vel = _tmp.copy(dir).multiplyScalar(BOLT_SPEED).add(player.vel);
     const bolt = G.vfx.fireBolt(_muzzle, vel, 0xffc860, 'player', 1.7);
-    if (bolt) bolt.dmg = 34 * player.phaserDamageMul;
+    if (bolt) bolt.dmg = 34 * player.phaserDamageMul * (player.shipPhaserMul || 1) * (player.partPhaserMul || 1);
     // r15 CANNON HEAT UPGRADE — the divisor is the whole mechanic.
     // HEAT_PER_SHOT is unchanged at 0.085 and so is every cooldown semantic
     // below (decay 0.28/s after a 0.35s idle, un-overheat at 0.35). What grows
@@ -1550,8 +1559,9 @@ export function initFlight(G) {
     const vel = _tmp.copy(_torpDir).multiplyScalar(TORPEDO_SPEED).add(player.vel);
     const b = G.vfx.fireBolt(_torpMuzzle, vel, 0xff5a1e, 'player', 3.6);
     if (b) {
-      b.dmg = TORPEDO_DAMAGE * player.torpedoDamageMul;
-      b.splashDmg = TORPEDO_SPLASH_DAMAGE * player.torpedoDamageMul;
+      const torpedoMul = player.torpedoDamageMul * (player.shipTorpedoMul || 1) * (player.partTorpedoMul || 1);
+      b.dmg = TORPEDO_DAMAGE * torpedoMul;
+      b.splashDmg = TORPEDO_SPLASH_DAMAGE * torpedoMul;
       b.torpedo = true;
       b.life = 4.0;
     }
@@ -1633,6 +1643,7 @@ export function initFlight(G) {
   function damagePlayer(amount) {
     if (G.state === 'destroyed') return; // wreck takes no further hits
     if (G.dietest) amount *= 8; // ?dietest=1 — accelerated death for testing (HARNESS.md)
+    amount *= (player.damageTakenMul || 1);
     player.lastDamageT = G.time;
     G.post.hit(0.5);
     G.audio.shieldHit();
@@ -2077,7 +2088,7 @@ export function initFlight(G) {
     player.quat.normalize();
 
     _fwd.set(0, 0, -1).applyQuaternion(player.quat);
-    const maxV = inp.boost ? MAXV.boost : MAXV.cruise;
+    const maxV = (inp.boost ? MAXV.boost : MAXV.cruise) * (player.speedMul || 1);
     const targetSpeed = inp.thrust * maxV * (braking ? 0.35 : 1);
     // ship-style flight: velocity chases forward*targetSpeed
     _tmp.copy(_fwd).multiplyScalar(targetSpeed);
@@ -2119,9 +2130,11 @@ export function initFlight(G) {
     if (torpedoCd > 0) torpedoCd = Math.max(0, torpedoCd - dt);
     player.torpedoCd = torpedoCd;
 
-    // shield regen after 5s without damage
-    if (player.shield < 100 && G.time - player.lastDamageT > 5) {
-      player.shield = Math.min(100, player.shield + dt * 14);
+    if (player.shield < 100 && G.time - player.lastDamageT > (player.shieldRegenDelay || 5)) {
+      player.shield = Math.min(100, player.shield + dt * (player.shieldRegenRate || 14));
+    }
+    if (player.hullRegenRate && player.hull < 100 && G.time - player.lastDamageT > 3) {
+      player.hull = Math.min(100, player.hull + dt * player.hullRegenRate);
     }
 
     // engine trail particles when boosting

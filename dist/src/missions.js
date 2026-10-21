@@ -361,6 +361,10 @@ export function initMissions(G) {
     targetObj: null,
     briefing: false,
     stationKeeping: false,
+    mode: 'idle',
+    offers: [],
+    contract: null,
+    contractHint: '',
   };
 
   let lastType = null;
@@ -397,40 +401,118 @@ export function initMissions(G) {
     };
   }
 
-  function chooseType(sysIndex, safe, forced) {
-    if (forced && TYPE_META[forced]) return forced;
-    if (sysIndex === 0) return 'science';
-    const rng = G.rngFor('mission-' + sysIndex + (safe ? '-safe' : '-hostile'));
-    const deck = safe
-      ? ['diplomacy', 'relief', 'science']
-      : ['combat', 'combat', 'diplomacy', 'relief', 'science'];
-    let t = deck[(rng() * deck.length) | 0];
-    if (t === lastType) {
-      const i = deck.indexOf(t);
-      t = deck[(i + 1) % deck.length];
+  function makeOffers(sysIndex) {
+    const sb = G.station && G.station.starbase;
+    if (!sb) return [];
+    const rng = G.rngFor('contracts-' + sysIndex + '-' + (G.telemetryData.assignmentsCompleted || 0));
+    const names = ['BRIGHT HORIZON', 'SILENT SENTINEL', 'OPEN HAND', 'LONG SHADOW', 'STEADFAST', 'WAYFARER'];
+    const targetPool = [sysIndex + 1, sysIndex + 3, sysIndex + 5, sysIndex - 1, sysIndex - 3]
+      .filter((i) => i >= 0 && !G.isSafeSystem(i));
+    const types = ['combat', 'diplomacy', 'relief', 'science'];
+    const usedNames = new Set();
+    const out = [];
+    for (let o = 0; o < 3; o++) {
+      const count = rng() < 0.42 ? 3 : 2;
+      let opName = pick(rng, names);
+      let guard = 0;
+      while (usedNames.has(opName) && guard++ < names.length) opName = pick(rng, names);
+      usedNames.add(opName);
+      const stages = [];
+      for (let k = 0; k < count; k++) {
+        let sys = targetPool[(rng() * targetPool.length) | 0];
+        if (sys === undefined) sys = sysIndex + 1;
+        if (k > 0 && rng() < 0.38) sys = stages[0].system;
+        if (k > 0 && stages[k - 1].system === sys) sys = G.isSafeSystem(sys + 2) ? sys + 4 : sys + 2;
+        let type = types[(rng() * types.length) | 0];
+        if (k === 0) type = rng() < 0.45 ? 'combat' : type;
+        stages.push({ system: sys, type, done: false });
+      }
+      const mult = 1 + (sysIndex / 2) * 0.22;
+      const systems = [...new Set(stages.map((st) => st.system))];
+      out.push({
+        id: 'C' + sysIndex + '-' + (G.telemetryData.assignmentsCompleted || 0) + '-' + o,
+        title: `OPERATION ${opName}`,
+        issuerSystem: sysIndex,
+        issuerName: sb.name.toUpperCase(),
+        stages,
+        targetNames: systems.map((i) => G.ensureSystem(i).area.toUpperCase()),
+        score: Math.round((280 + count * 130) * mult),
+        credits: Math.round((170 + count * 80) * mult),
+        blurb: count === 3 ? 'EXTENDED PATROL · THREE STAGES' : 'TWO-STAGE ASSIGNMENT',
+      });
     }
-    return t;
+    return out;
   }
 
-  function positionTarget(obj) {
-    const rng = G.rngFor('mission-pos-' + M.systemIndex);
-    _fwd.set(0, 0, -1).applyQuaternion(G.player.quat);
-    _right.set(1, 0, 0).applyQuaternion(G.player.quat);
-    _up.set(0, 1, 0).applyQuaternion(G.player.quat);
-    M.targetPos.copy(G.player.pos)
-      .addScaledVector(_fwd, 500 + rng() * 80)
-      .addScaledVector(_right, (rng() - 0.5) * 190)
-      .addScaledVector(_up, (rng() - 0.5) * 70);
-    obj.position.copy(M.targetPos);
-    obj.rotation.set(0, Math.atan2(-(G.player.pos.x - obj.position.x), -(G.player.pos.z - obj.position.z)), 0);
+  function beginStarbase(sysIndex) {
+    hideObjects();
+    M.active = false;
+    M.completed = false;
+    M.mode = 'starbase';
+    M.phase = null;
+    M.canInteract = false;
+    M.prompt = '';
+    M.stationKeeping = false;
+    M.wantsWarp = false;
+    M.departureTimer = 0;
+    M.systemIndex = sysIndex;
+    M.sequence++;
+    M.targetObj = null;
+    M.contractHint = '';
+    M.offers = M.contract ? [] : makeOffers(sysIndex);
+    return M;
   }
 
-  function hideObjects() {
-    for (const key of Object.keys(objects)) objects[key].group.visible = false;
-    beam.visible = false;
+  function beginDebrief(sysIndex) {
+    beginStarbase(sysIndex);
+    M.mode = 'debrief';
+    if (M.contract) M.contract.status = 'debrief';
+    return M;
+  }
+
+  function startContractStage(sysIndex) {
+    const c = M.contract;
+    const stage = c.stages[c.stageIndex];
+    startField(sysIndex, stage.type);
+    M.mode = 'contract';
+    M.title = c.title;
+    M.contractHint = `STAGE ${c.stageIndex + 1}/${c.stages.length} · ${TYPE_META[stage.type].kind}`;
+    return M;
+  }
+
+  function advanceContract() {
+    const c = M.contract;
+    if (!c) return;
+    const stage = c.stages[c.stageIndex];
+    stage.done = true;
+    if (c.stageIndex + 1 < c.stages.length) {
+      c.stageIndex++;
+      c.status = 'travel';
+      const next = c.stages[c.stageIndex];
+      M.contractHint = `STAGE COMPLETE · NEXT ${G.ensureSystem(next.system).area.toUpperCase()}`;
+    } else {
+      c.status = 'return';
+      M.contractHint = `ASSIGNMENT COMPLETE · RETURN TO ${c.issuerName}`;
+    }
+    M.departureTimer = 5.5;
   }
 
   function beginSystem(sysIndex, forcedType = null) {
+    M.systemIndex = sysIndex;
+    if (!forcedType && G.safeSystem) {
+      if (M.contract && M.contract.status === 'return' && M.contract.issuerSystem === sysIndex) {
+        return beginDebrief(sysIndex);
+      }
+      return beginStarbase(sysIndex);
+    }
+    if (!forcedType && M.contract && M.contract.status === 'travel'
+      && M.contract.stages[M.contract.stageIndex].system === sysIndex) {
+      return startContractStage(sysIndex);
+    }
+    return startField(sysIndex, forcedType);
+  }
+
+  function startField(sysIndex, forcedType = null) {
     hideObjects();
     M.active = true;
     M.completed = false;
@@ -444,6 +526,7 @@ export function initMissions(G) {
     M.stationKeeping = false;
     M.systemIndex = sysIndex;
     M.sequence++;
+    M.mode = M.contract && M.contract.status === 'travel' ? 'contract' : 'field';
     M.briefing = true;
     M.phase = 'briefing';
     M.type = chooseType(sysIndex, G.safeSystem, forcedType);
@@ -517,6 +600,39 @@ export function initMissions(G) {
     return M;
   }
 
+  function chooseType(sysIndex, safe, forced) {
+    if (forced && TYPE_META[forced]) return forced;
+    if (sysIndex === 0) return 'science';
+    const rng = G.rngFor('mission-' + sysIndex + (safe ? '-safe' : '-hostile'));
+    const deck = safe
+      ? ['diplomacy', 'relief', 'science']
+      : ['combat', 'combat', 'diplomacy', 'relief', 'science'];
+    let t = deck[(rng() * deck.length) | 0];
+    if (t === lastType) {
+      const i = deck.indexOf(t);
+      t = deck[(i + 1) % deck.length];
+    }
+    return t;
+  }
+
+  function positionTarget(obj) {
+    const rng = G.rngFor('mission-pos-' + M.systemIndex);
+    _fwd.set(0, 0, -1).applyQuaternion(G.player.quat);
+    _right.set(1, 0, 0).applyQuaternion(G.player.quat);
+    _up.set(0, 1, 0).applyQuaternion(G.player.quat);
+    M.targetPos.copy(G.player.pos)
+      .addScaledVector(_fwd, 500 + rng() * 80)
+      .addScaledVector(_right, (rng() - 0.5) * 190)
+      .addScaledVector(_up, (rng() - 0.5) * 70);
+    obj.position.copy(M.targetPos);
+    obj.rotation.set(0, Math.atan2(-(G.player.pos.x - obj.position.x), -(G.player.pos.z - obj.position.z)), 0);
+  }
+
+  function hideObjects() {
+    for (const key of Object.keys(objects)) objects[key].group.visible = false;
+    beam.visible = false;
+  }
+
   function finish() {
     if (M.completed) return;
     M.completed = true;
@@ -557,6 +673,7 @@ export function initMissions(G) {
       at: Math.round(G.time * 10) / 10,
     });
     if (T.missionLog.length > 12) T.missionLog.shift();
+    if (M.mode === 'contract') advanceContract();
     if (G.audio && G.audio.chime) G.audio.chime();
     if (M.targetObj && objects[M.type] && objects[M.type].marker) {
       objects[M.type].marker.material.color.setHex(0x9dffd6);
@@ -618,9 +735,15 @@ export function initMissions(G) {
         M.departureTimer = Math.max(0, M.departureTimer - dt);
         if (M.departureTimer <= 0) M.wantsWarp = true;
       }
-      M.hint = G.safeSystem
-        ? 'MISSION COMPLETE · JUMP WHEN READY'
-        : (M.departureTimer > 0 ? `MISSION COMPLETE · WARP IN ${Math.ceil(M.departureTimer)}s` : 'MISSION COMPLETE · WARPING');
+      if (M.mode === 'contract' && M.contractHint) {
+        M.hint = M.departureTimer > 0
+          ? `${M.contractHint} · WARP IN ${Math.ceil(M.departureTimer)}s`
+          : `${M.contractHint} · WARPING`;
+      } else {
+        M.hint = G.safeSystem
+          ? 'MISSION COMPLETE · JUMP WHEN READY'
+          : (M.departureTimer > 0 ? `MISSION COMPLETE · WARP IN ${Math.ceil(M.departureTimer)}s` : 'MISSION COMPLETE · WARPING');
+      }
       return;
     }
 
@@ -733,6 +856,64 @@ export function initMissions(G) {
     M.stationKeeping = false;
     M.wantsWarp = false;
     M.departureTimer = 0;
+    M.mode = 'idle';
+    M.offers = [];
+    M.lastDebrief = '';
+  };
+  M.nextWarpTarget = () => {
+    const c = M.contract;
+    if (!c) return null;
+    if (c.status === 'travel') return c.stages[c.stageIndex].system;
+    if (c.status === 'return' || c.status === 'debrief') return c.issuerSystem;
+    return null;
+  };
+  M.acceptOffer = (index) => {
+    if (M.contract || !M.offers[index]) return false;
+    const offer = M.offers[index];
+    M.contract = {
+      id: offer.id, title: offer.title,
+      issuerSystem: offer.issuerSystem, issuerName: offer.issuerName,
+      stages: offer.stages.map((st) => ({ ...st })),
+      stageIndex: 0, status: 'travel',
+      score: offer.score, credits: offer.credits,
+      acceptedAt: G.time,
+    };
+    M.offers = [];
+    M.mode = 'starbase';
+    M.lastDebrief = '';
+    const first = G.ensureSystem(M.contract.stages[0].system);
+    M.contractHint = `COURSE SET · ${first.area.toUpperCase()}`;
+    G.setCourse(M.contract.stages[0].system);
+    if (G.audio && G.audio.chime) G.audio.chime();
+    return true;
+  };
+  M.abandonContract = () => {
+    if (!M.contract) return false;
+    M.contract = null;
+    G.clearCourse();
+    M.contractHint = 'ASSIGNMENT RELEASED';
+    beginStarbase(G.systemIndex);
+    M.contractHint = 'ASSIGNMENT RELEASED';
+    return true;
+  };
+  M.completeContract = () => {
+    const c = M.contract;
+    if (!c || c.status !== 'debrief') return false;
+    const T = G.telemetryData;
+    T.score += c.score;
+    T.assignmentsCompleted = (T.assignmentsCompleted || 0) + 1;
+    T.reputation = (T.reputation || 0) + 1;
+    G.player.credits = (G.player.credits || 0) + c.credits;
+    T.credits = G.player.credits;
+    T.creditsEarned += c.credits;
+    if (G.career) G.career.contracts = (G.career.contracts || 0) + 1;
+    M.contract = null;
+    const name = c.title;
+    beginStarbase(G.systemIndex);
+    M.lastDebrief = `${name} CLOSED · +${c.score} SCORE · +${c.credits} CR`;
+    M.contractHint = M.lastDebrief;
+    if (G.audio && G.audio.chime) G.audio.chime();
+    return true;
   };
   M.interact = () => {
     if (!M.active || M.completed || M.phase !== 'approach' || !M.canInteract) return false;

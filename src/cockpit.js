@@ -18,6 +18,7 @@
 //    warm sun-spill patch on the sun side of the dash in planet daylight
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { rankName } from './career.js';
 // R10: environment coupling. See src/worldlight.js for the full rationale —
 // short version, all five r9 critics said the cockpit reads "composited on
 // top" because it is lit entirely by its own rig and by an orientation-
@@ -4325,7 +4326,7 @@ export function initCockpit(G) {
       if (G.mode !== 'planet') {
         ctx.fillStyle = WHITE_DIM;
         ctx.font = FONT('500', 22);
-        ctx.fillText(`${G.names.shipClass} CLASS · ${G.names.quadrant} QUADRANT`, 24, 94);
+        ctx.fillText(`${G.names.shipClass} CLASS · ${rankName(G)} · ${G.names.quadrant} QUADRANT`, 24, 94);
       } else {
         // on the surface NMS surfaces environment data (r9 critic: the
         // one-word panel was 80% empty black) — quiet hazard readouts

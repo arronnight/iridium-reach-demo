@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { starbaseForSystem } from './career.js';
 
 export function initStation(G) {
   const group = new THREE.Group();
@@ -97,10 +98,12 @@ export function initStation(G) {
   const label = 'DEEP SPACE PORT';
   let safe = false;
   let dockable = false;
+  let starbase = null;
 
   function setSystem(sys, isSafe) {
     safe = !!isSafe;
     dockable = safe;
+    starbase = safe ? starbaseForSystem(sys) : null;
     group.position.set(sys * 40000, 0, -2200);
     group.visible = safe;
   }
@@ -132,7 +135,8 @@ export function initStation(G) {
     canDock,
     get safe() { return safe; },
     get dockable() { return dockable; },
-    get label() { return label; },
+    get label() { return starbase ? starbase.name.toUpperCase() : label; },
+    get starbase() { return starbase; },
     get planetName() { return G.names.planet; },
   };
   return G.station;

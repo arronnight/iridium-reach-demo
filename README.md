@@ -33,11 +33,18 @@ manage heat-limited phaser banks and a slow-loading photon torpedo, survive
 the red alert, then jump to the next sector — each one harder than the last.
 Every other sector is a safe haven where you can repair, resupply and upgrade.
 
-Each sector opens with a Starfleet assignment. Clear a hostile patrol, hail a
-local envoy, run medical supplies to a colony, or conduct a passive first-contact
-scan. Diplomacy and science want you to hold station with weapons cold; relief
-wants you close enough to run a cargo beam. Missions pay score and requisition
-credits, scaled by how far you have travelled from home.
+Each sector opens with a Starfleet field encounter. Clear a hostile patrol, hail
+a local envoy, run medical supplies to a colony, or conduct a passive
+first-contact scan. Diplomacy and science want you to hold station with weapons
+cold; relief wants you close enough to run a cargo beam. Missions pay score and
+requisition credits, scaled by how far you have travelled from home.
+
+Safe sectors are starbases DS1 through DS9. Each port posts a board of
+two- and three-stage assignments: patrol a hostile sector, divert to a colony,
+then return to the issuing starbase for debrief. Contracts pay a completion
+bonus, advance your Starfleet rank, and can send you back through sectors you
+have already visited. Ports also sell ship parts and new commands; DS9's
+shipyard eventually offers the Sovereign-class U.S.S. Enterprise.
 
 - **Three hostile classes, three fleets** — Klingon K't'inga battlecruisers,
   B'rel Birds-of-Prey and Vor'cha attack cruisers; Romulan Scouts and
@@ -55,9 +62,17 @@ credits, scaled by how far you have travelled from home.
   Cardassian ships, and Romulan sectors field Romulan ones
 - **Sector missions** — patrol, diplomacy, planetary relief and first contact.
   Safe sectors never ask you to fire first
+- **Starbases DS1-DS9** — assignment boards, multi-stage contracts, debriefs,
+  rank progression, ship parts and a shipyard, with the Enterprise-E waiting
+  at DS9 for a captain
+- **Revisitable space** — choose a previous or future sector from the port
+  navigation board instead of always jumping forward
+- **Career progression** — Ensign to Captain through missions and assignment
+  completions; new ranks unlock better parts and commands
 - **Safe havens** — friendly ports with no hostiles. Dock to patch the hull,
   recharge shields, upgrade torpedoes or recalibrate the phaser array
-- **Requisition credits** — earned from kills and wave clears, spent at port
+- **Requisition credits** — earned from kills, waves and assignments; spent at
+  port on repairs, refits, parts and ships
 - **Scoring** — per-kill and wave bonuses, persistent high score
 - **Phaser upgrades** — every wave cleared doubles your heat endurance,
   MK I through MK IV; port calibration adds up to +60% damage
@@ -85,13 +100,14 @@ Keyboard and mouse, or an Xbox/XInput controller.
 | E | mission action (hail, scan, transfer) · dock at a safe haven |
 | J | jump from safe space |
 | Esc | pause · settings (mouse sensitivity, invert Y); returns to conn while docked |
+| Dock board (keyboard) | Up/Down select · Enter buy/accept/set course · Esc return |
 | Xbox left stick | pitch · yaw |
 | Xbox right stick | roll · throttle |
 | RT / LT | phasers / photon torpedo |
 | LB / RB | impulse boost / brake-turn |
 | A / B / Y | mission action or dock / undock / jump |
 | Start | pause · resume |
-| D-pad + A (docked) | select and buy upgrades |
+| D-pad + A (docked) | select assignments, parts, ships, courses and upgrades |
 
 ## How it was built
 
@@ -127,8 +143,9 @@ This is a tech demo, and it knows it:
   is rock-free — the collision system arrived before the level design did.
 - Safe havens are one-screen repair and requisition ports, not walkable
   station interiors.
-- Missions are short encounter vignettes, not branching storylines: one
-  objective, one contact, then the next jump.
+- Field encounters are one-objective vignettes; starbase assignments chain
+  two or three of them into a contract with a return-to-port debrief, not a
+  branching storyline.
 - Targets 60fps at 1080p; measured grazing the bar on an Apple M4. Your
   mileage may vary with GPU and browser.
 - Best experienced in Chrome. Audio starts after your first click (browser

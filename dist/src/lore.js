@@ -65,6 +65,13 @@ export function pickShip(rng) {
   return STARFLEET_SHIPS[(rng() * STARFLEET_SHIPS.length) | 0];
 }
 
+const STARTER_CLASSES = new Set(['Miranda', 'Excelsior', 'Soyuz', 'New Orleans', 'Niagara', 'Freedom', 'Springfield', 'Saber', 'Steamrunner']);
+
+export function pickStarterShip(rng) {
+  const pool = STARFLEET_SHIPS.filter((ship) => STARTER_CLASSES.has(ship.className));
+  return pool[(rng() * pool.length) | 0];
+}
+
 export function pickArea(rng, friendly = false) {
   const pool = friendly ? MAP_AREAS.filter((area) => area.friendly) : MAP_AREAS;
   return pool[(rng() * pool.length) | 0];

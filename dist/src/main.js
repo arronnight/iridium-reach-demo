@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { initPost } from './post.js';
 import { initStation } from './station.js';
 import { initMissions } from './missions.js';
-import { pickShip, pickArea, areaForName } from './lore.js';
+import { pickStarterShip, pickArea, areaForName } from './lore.js';
+import { initCareer, starbaseForSystem, rankName } from './career.js';
 import { initAudio } from './audio.js';
 import { initSpace } from './space.js';
 import { initPlanet } from './planet.js';
@@ -156,7 +157,7 @@ const G = {
     forceCleared: false, forceClearedKills: 0,
     // r15 cannon heat upgrade — MK I / cap 1 is the round-14 cannon exactly
     cannonMk: 1, cannonHeatCap: 1, cannonUpgrades: 0,
-    missionStarts: 0, missionsCompleted: 0, missionsByType: {}, missionLog: [],
+    missionStarts: 0, missionsCompleted: 0, assignmentsCompleted: 0, missionsByType: {}, missionLog: [],
   },
   camOffset: new THREE.Quaternion(), // posed camera cant/shake (moments only)
   // human-play tuning (ui.js overwrites from localStorage; harness boots keep
@@ -172,12 +173,14 @@ if (!HARNESS) {
   G.uiState = 'start';
 }
 
+let startShip = null;
 {
   const nrng = G.rngFor('names0');
   applySystemArea(genSystemName(nrng));
   G.names.nextSystem = genSystemName(nrng, true);
   G.names.planet = genPlanetName(nrng);
-  const ship = pickShip(nrng);
+  const ship = pickStarterShip(nrng);
+  startShip = ship;
   G.names.ship = `${ship.name} ${ship.registry}`;
   G.names.shipClass = ship.className;
   G.names.registry = ship.registry;
@@ -189,11 +192,33 @@ initSpace(G);
 initPlanet(G);
 initVfx(G);
 initFlight(G);
+initCareer(G, startShip);
 initCockpit(G);
 initPost(G);
 initStation(G);
 
 G.isSafeSystem = (i) => i > 0 && i % 2 === 1;
+G.starbaseForSystem = starbaseForSystem;
+G.systemMap = new Map();
+G.travelTarget = null;
+G.ensureSystem = (index) => {
+  if (G.systemMap.has(index)) return G.systemMap.get(index);
+  const safe = G.isSafeSystem(index);
+  const rng = G.rngFor('system-map-' + index);
+  const area = pickArea(rng, safe);
+  const rec = {
+    index, area: area.name, safe,
+    planet: planetForSystem(area.name, G.rngFor('pnames' + index)),
+    quadrant: area.quadrant, power: area.power,
+  };
+  G.systemMap.set(index, rec);
+  return rec;
+};
+G.systemMap.set(0, {
+  index: 0, area: G.names.system, safe: false, planet: G.names.planet,
+  quadrant: G.names.quadrant, power: G.names.power,
+});
+G.names.nextSystem = G.ensureSystem(1).area;
 G.safeSystem = G.isSafeSystem(0);
 G.station.setSystem(0, G.safeSystem);
 G.space.setSystem(0);
@@ -303,6 +328,7 @@ const SM = {
   timer: 0,
   freeWaveTimer: 14, // free play: first wave after 14s of cruising
   build: null,       // staged destination-system build (see above)
+  warpTarget: null,
   set(state, t = 0) { G.state = state; SM.timer = t; },
   beginSystemBuild(sys) {
     const hasWorkerBuild = !!(G.planet.beginBuild && G.planet.stepBuild);
@@ -353,16 +379,27 @@ const SM = {
     if (!b.spaceDone) G.space.setSystem(b.sys);
     SM.build = null;
   },
-  beginWarp() {
+  beginWarp(target = null) {
     if (G.mode !== 'space') return false;
     if (G.state === 'warp' || G.state === 'warp-charge' || G.state === 'arrive') return false;
+    if (target == null) {
+      const contractTarget = G.missions && G.missions.nextWarpTarget
+        ? G.missions.nextWarpTarget()
+        : null;
+      target = contractTarget != null
+        ? contractTarget
+        : (G.travelTarget != null ? G.travelTarget : G.systemIndex + 1);
+    }
+    target = Math.max(0, Number(target) | 0);
+    if (target === G.systemIndex) target = G.systemIndex + 1;
+    const rec = G.ensureSystem(target);
     if (G.missions) G.missions.depart();
     SM.set('warp-charge', 3.5);
-    const nrng = G.rngFor('names' + (G.systemIndex + 1));
-    G.names.nextSystem = genSystemName(nrng, G.isSafeSystem(G.systemIndex + 1));
+    SM.warpTarget = target;
+    G.names.nextSystem = rec.area;
     G.audio.warpSwell();
     G.audio.say && G.audio.say('warp-charge');
-    SM.beginSystemBuild(G.systemIndex + 1);
+    SM.beginSystemBuild(target);
     return true;
   },
   handleWaveEnd(baseState) {
@@ -441,11 +478,15 @@ const SM = {
         if (SM.timer <= 0) {
           G.noteSpike('warp-off');
           G.vfx.setWarp(false);
-          G.systemIndex++;
-          applySystemArea(G.names.nextSystem);
-          const nrng = G.rngFor('pnames' + G.systemIndex);
-          G.safeSystem = G.isSafeSystem(G.systemIndex);
-          G.names.planet = planetForSystem(G.names.system, nrng);
+          const target = SM.warpTarget != null ? SM.warpTarget : G.systemIndex + 1;
+          SM.warpTarget = null;
+          G.systemIndex = target;
+          const rec = G.ensureSystem(target);
+          applySystemArea(rec.area);
+          G.safeSystem = rec.safe;
+          G.names.planet = rec.planet;
+          G.names.nextSystem = G.ensureSystem(target + 1).area;
+          if (G.travelTarget === target) G.travelTarget = null;
           SM.finishSystemBuild(); // usually a no-op: staged during the tunnel
           G.player.pos.set(G.systemIndex * 40000, 0, 0);
           G.player.vel && G.player.vel.set(0, 0, 0);
@@ -513,6 +554,18 @@ G.requestJump = () => {
   if (!G.safeSystem || G.uiHold || G.mode !== 'space') return false;
   if (G.state !== 'cruise') return false;
   return SM.beginWarp();
+};
+
+G.setCourse = (index) => {
+  const target = Math.max(0, Number(index) | 0);
+  if (!Number.isFinite(target) || target === G.systemIndex) return false;
+  G.ensureSystem(target);
+  G.travelTarget = target;
+  return true;
+};
+
+G.clearCourse = () => {
+  G.travelTarget = null;
 };
 
 // ---------------- input ----------------
@@ -1517,6 +1570,10 @@ window.__telemetry = function () {
       forceClearedKills: T.forceClearedKills,
       enemyClassStats: T.enemyClassStats,
       missionsCompleted: T.missionsCompleted,
+      assignmentsCompleted: T.assignmentsCompleted,
+      rank: G.career ? rankName(G) : null,
+      shipClass: G.career ? G.career.currentShipId : null,
+      partsInstalled: G.career ? G.career.partsInstalled : 0,
       missionsByType: T.missionsByType,
       missionLog: T.missionLog,
       ...(G.missions ? {
