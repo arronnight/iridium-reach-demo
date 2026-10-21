@@ -37,9 +37,12 @@ function panelTexture(c) {
   return tex;
 }
 
-const ORANGE = '#ff9a2a';
-const AMBER = '#ffb545';
-const DIM = '#7a4a16';
+const ORANGE = '#ff9c00';   // LCARS orange
+const AMBER = '#ffcc99';    // LCARS peach
+const DIM = '#9a5a00';
+const LCARS_LAVENDER = '#cc99cc';
+const LCARS_BLUE = '#99ccff';
+const LCARS_RED = '#cc6666';
 // R9 typography (blind-verdict defect 2, named four rounds running): NMS sets
 // its HUD in a CONDENSED geometric grotesque (Geogrotesque), not a chunky
 // full-width Futura bold. Avenir Next Condensed is the closest resident face
@@ -807,7 +810,7 @@ function chip(ctx, x, y, w, h, opts = {}) {
 // the critics read as placeholder boxes)
 function microLabel(ctx, x, y, text, size = 14) {
   ctx.save();
-  ctx.fillStyle = 'rgba(200,140,70,0.55)';
+  ctx.fillStyle = 'rgba(204,153,204,0.65)';
   ctx.font = FONT('500', size);
   setTracking(ctx, 1.5);
   ctx.fillText(text, x, y);
@@ -934,8 +937,8 @@ function stickGlyph(ctx, x, yMid) {
 
 // deterministic hostile designation (combat target readout)
 function genTargetName(rng) {
-  const A = ['Sentinel', 'Outlaw', 'Corsair', 'Renegade', 'Marauder'];
-  const B = ['Interceptor', 'Striker', 'Phantom', 'Reaver', 'Dropship'];
+  const A = ['Klingon', 'Romulan', 'Klingon', 'Romulan', 'Klingon'];
+  const B = ['Bird-of-Prey', 'Scout', 'Battlecruiser', 'Warbird', 'Raider'];
   return A[(rng() * A.length) | 0] + ' ' + B[(rng() * B.length) | 0];
 }
 
@@ -950,7 +953,7 @@ export function initCockpit(G) {
   // destination star class) — replaces raw coordinate pairs / numeric fuel
   const hudRng = G.rngFor('cockpit-hud');
   const BIOMES = ['Desolate', 'Lush', 'Scorched', 'Frozen', 'Toxic', 'Irradiated', 'Verdant'];
-  const biomeTag = BIOMES[(hudRng() * BIOMES.length) | 0] + ' Planet';
+  const biomeTag = 'Class-M · ' + BIOMES[(hudRng() * BIOMES.length) | 0];
   // stream-preserving draw: the value itself is superseded by the per-planet
   // discovery value below (r9 critic: a byte-identical "194,978u" across two
   // different planet names was the static-placeholder tell), but the draw
@@ -979,14 +982,8 @@ export function initCockpit(G) {
     for (let i = 0; i < s.length; i++) hsh = (hsh * 31 + s.charCodeAt(i)) | 0;
     return Math.abs(hsh);
   }
-  const planetBiome = () => BIOMES[planetHash() % BIOMES.length] + ' Planet';
+  const planetBiome = () => 'Class-M · ' + BIOMES[planetHash() % BIOMES.length];
   const planetValue = () => 140000 + (Math.imul(planetHash() ^ 0x9e3779b9, 2654435761) >>> 0) % 700000;
-  function nameHash(str) {
-    const t = str || '';
-    let hsh = 0;
-    for (let i = 0; i < t.length; i++) hsh = (hsh * 31 + t.charCodeAt(i)) | 0;
-    return Math.abs(hsh);
-  }
   // nav coordinates track where the ship actually IS. Wrapped into a
   // lat/long-shaped pair so the readout moves system to system and pose to
   // pose instead of printing one boot-time constant forever.
@@ -1003,9 +1000,13 @@ export function initCockpit(G) {
     const lon = wrap(p.x * 0.0037 + G.systemIndex * 118.3, 180);
     return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
   };
-  // destination star class follows the destination, environment readouts
-  // follow the planet — both were boot-time constants
-  const destClassNow = () => ['G2', 'K7', 'F0', 'E3', 'B8'][nameHash(G.names.nextSystem) % 5];
+  // warp factor follows the ship's actual speed; the destination readouts
+  // follow the planet rather than staying boot-time constants
+  const warpFactorNow = () => {
+    const sp = Math.abs(G.player.speed) || 0;
+    const f = sp > 1000 ? 1 + Math.log10(1 + sp) * 1.6 : 7.0;
+    return Math.min(9.9, f).toFixed(1);
+  };
   const envTempNow = () => (planetHash() % 380 / 10 - 8).toFixed(1);
   const envRadNow = () => (0.2 + (planetHash() >> 5) % 90 / 100).toFixed(1);
 
@@ -1865,7 +1866,7 @@ export function initCockpit(G) {
       uniform vec3 uColor; uniform float uTime;
       varying vec3 vN; varying vec3 vV; varying vec3 vP;
       void main() {
-        float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0);
+        float f = pow(clamp(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), 3.0);
         // faint horizontal scan shimmer crawling up the shell
         float scan = 0.04 * (0.5 + 0.5 * sin(vP.y * 260.0 - uTime * 2.1));
         // limb kept WELL under bloom: both critics read the hot shell as an
@@ -3448,12 +3449,14 @@ export function initCockpit(G) {
     // metal bezel frame with a lit top lip edge
     // R9 (defect 2): alert bezel pushed properly red — ref-5's panel frames
     // are drenched, only the screen glass and copy stay dark/white
-    ctx.fillStyle = alert ? '#4d1c12' : '#272b32';
+    ctx.fillStyle = alert ? '#4d1c12' : '#15120f';
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = alert ? '#7e2f1f' : '#3c424c';
-    ctx.fillRect(0, 0, w, 3);
-    ctx.fillStyle = '#101216';
-    ctx.fillRect(5, 5, w - 10, h - 10);
+    // LCARS frame: a signal-orange cap and a left-hand colour rail
+    ctx.fillStyle = alert ? '#e04020' : ORANGE;
+    ctx.fillRect(0, 0, w, 6);
+    ctx.fillRect(0, 6, 8, h - 6);
+    ctx.fillStyle = '#080a0d';
+    ctx.fillRect(10, 8, w - 16, h - 14);
     // corner screws
     ctx.fillStyle = '#4a4f58';
     for (const [x, y] of [[8, 8], [w - 8, 8], [8, h - 8], [w - 8, h - 8]]) {
@@ -3484,8 +3487,8 @@ export function initCockpit(G) {
     // housing would, instead of sitting under it
     _cut = cut; _cutAlert = alert;
     brokenBorder(ctx, 14, 14, w - 28, h - 28,
-      alert ? 'rgba(255,120,95,0.55)' : 'rgba(235,240,245,0.42)');
-    tickStrip(ctx, 22, 19, 5, alert ? 'rgba(255,110,80,0.85)' : 'rgba(255,154,42,0.75)');
+      alert ? 'rgba(255,120,95,0.55)' : 'rgba(255,204,153,0.42)');
+    tickStrip(ctx, 22, 19, 5, alert ? 'rgba(255,110,80,0.85)' : 'rgba(255,156,0,0.85)');
     if (title) {
       // R9: DemiBold (600), slight positive tracking, minimal halo + thin
       // AMBER underline — condensed face carries the NMS title treatment now
@@ -3494,7 +3497,7 @@ export function initCockpit(G) {
       setTracking(ctx, 1.5);
       glowText(ctx, title, 24, h * 0.245, WHITE, 4);
       setTracking(ctx, 0);
-      ctx.strokeStyle = 'rgba(255,154,42,0.40)';
+      ctx.strokeStyle = 'rgba(255,156,0,0.55)';
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(24, h * 0.29); ctx.lineTo(w - 24, h * 0.29); ctx.stroke();
     }
@@ -3688,7 +3691,7 @@ export function initCockpit(G) {
     hudLabel(ctx, 'economy', w - 26, 118, 12);
     ctx.font = FONT('500', 21);
     ctx.fillStyle = WHITE_DIM;
-    ctx.fillText('T2 · Trading', w - 26, 142);
+    ctx.fillText('Federation Trade Hub', w - 26, 142);
     hudLabel(ctx, 'conflict', w - 26, 176, 12);
     ctx.font = FONT('500', 21);
     ctx.fillStyle = WHITE_DIM;
@@ -3706,7 +3709,7 @@ export function initCockpit(G) {
       ctx.stroke();
     }
     ctx.textAlign = 'right';
-    hudLabel(ctx, 'undiscovered', w - 26, h - 26, 12, 'rgba(225,230,236,0.38)');
+    hudLabel(ctx, 'uncharted', w - 26, h - 26, 12, 'rgba(225,230,236,0.38)');
     ctx.textAlign = 'left';
     screenGlass(ctx, w, h, t, 1);
   }
@@ -3718,7 +3721,7 @@ export function initCockpit(G) {
     // tracking, slightly dimmed; the segmented bar is the value
     ctx.font = FONT('500', 26);
     setTracking(ctx, 4);
-    glowText(ctx, 'SHIELD', 24, 126, 'rgba(238,242,246,0.80)', 5);
+    glowText(ctx, 'SHIELDS', 24, 126, 'rgba(238,242,246,0.80)', 5);
     setTracking(ctx, 0);
     // WHITE segmented shield bar (ref-5's shield readout is white blocks)
     {
@@ -3726,7 +3729,7 @@ export function initCockpit(G) {
       for (let i = 0; i < segs; i++) {
         const on = i / segs < sh;
         ctx.fillStyle = on
-          ? (sh > 0.35 ? 'rgba(240,244,248,0.92)' : 'rgba(255,120,90,0.92)')
+          ? (sh > 0.35 ? 'rgba(153,204,255,0.95)' : 'rgba(255,120,90,0.92)')
           : 'rgba(120,125,132,0.22)';
         ctx.fillRect(x0 + i * sw2, y0, sw2 - 4, 30);
       }
@@ -3776,13 +3779,13 @@ export function initCockpit(G) {
     // corner panel, and a crop must never eat digits (round-6 flag)
     const v = `${Math.abs(G.player.speed) | 0}`;
     ctx.font = FONT('600', 34);
-    const uw = ctx.measureText('u/s').width;
+    const uw = ctx.measureText('IMP').width;
     ctx.font = FONT('600', 64);
     const vw = ctx.measureText(v).width;
     const x1 = w - 52;
     glowText(ctx, v, x1 - uw - 8 - vw, h * 0.60, WHITE, 5);
     ctx.font = FONT('600', 34);
-    glowText(ctx, 'u/s', x1 - uw, h * 0.60, 'rgba(240,243,246,0.80)', 4);
+    glowText(ctx, 'IMP', x1 - uw, h * 0.60, 'rgba(240,243,246,0.80)', 4);
     ctx.strokeStyle = 'rgba(235,240,245,0.28)';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(w * 0.30, h * 0.70); ctx.lineTo(w - 34, h * 0.70); ctx.stroke();
@@ -3816,7 +3819,7 @@ export function initCockpit(G) {
     // title in a ticked chip — white copy (ref-5's Photon Cannon card)
     chip(ctx, 18, 42, w - 36, 44, { icon: 'dot', color: 'rgba(235,240,245,0.30)' });
     ctx.font = FONT('600', 29);
-    glowText(ctx, 'Photon Cannon', 46, 74, WHITE, 6);
+    glowText(ctx, 'Phaser Banks', 46, 74, WHITE, 6);
     // heat bar: WHITE fill in a thin white track (ref-5's is white)
     const heat = G.player.heat;
     ctx.strokeStyle = 'rgba(235,240,245,0.40)'; ctx.lineWidth = 2;
@@ -3851,13 +3854,28 @@ export function initCockpit(G) {
     ctx.fillStyle = G.player.overheated ? '#ff4030' : WHITE_DIM;
     ctx.font = FONT('500', 22);
     setTracking(ctx, 4);
-    ctx.fillText(G.player.overheated ? 'OVERHEAT' : 'HEAT', 24, 188);
+    ctx.fillText(G.player.overheated ? 'OVERLOAD' : 'PHASER HEAT', 24, 188);
     setTracking(ctx, 0);
     // the mark badge was a DECORATIVE LITERAL for twelve rounds ('MK-II' on a
     // cannon that had no marks). It now tells the truth once there is a truth
     // to tell; at MK I it keeps the original string, byte for byte, because
     // that string is in every committed posed capture.
-    microLabel(ctx, 200, 188, cap > 1 ? `MK-${ROMAN[G.player.cannonMk] || G.player.cannonMk} · CHG 04` : 'MK-II · CHG 04');
+    microLabel(ctx, 200, 188, cap > 1 ? `MK-${ROMAN[G.player.cannonMk] || G.player.cannonMk} · CHG 04` : 'BANK 01 · CHG 04');
+    // photon torpedo launcher: ready bar + label, LCARS blue when loaded
+    {
+      const cd = Math.max(0, G.player.torpedoCd || 0);
+      const max = G.player.torpedoMax || 3.2;
+      const ready = Math.max(0, 1 - cd / max);
+      hudLabel(ctx, 'photon torpedo', 24, 220, 11);
+      ctx.strokeStyle = 'rgba(235,240,245,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(24, 230, w - 48, 12);
+      ctx.fillStyle = ready >= 1 ? 'rgba(153,204,255,0.95)' : 'rgba(255,156,0,0.65)';
+      ctx.fillRect(26, 232, (w - 52) * ready, 8);
+      ctx.textAlign = 'right';
+      microLabel(ctx, w - 24, 220, ready >= 1 ? 'READY' : `LOADING ${Math.ceil(cd * 10) / 10}s`, 12);
+      ctx.textAlign = 'left';
+    }
     screenGlass(ctx, w, h, t, 4);
   }
 
@@ -4037,7 +4055,7 @@ export function initCockpit(G) {
       ctx.textAlign = 'center';
       ctx.font = FONT('500', 29);
       setTracking(ctx, 5);
-      const bt = 'SHIELD DOWN  //  RECHARGE IMMEDIATELY';
+      const bt = 'SHIELDS DOWN  //  RECHARGE IMMEDIATELY';
       const btw = ctx.measureText(bt).width;
       ctx.fillStyle = 'rgba(7,8,11,0.30)';
       ctx.fillRect(w / 2 - btw / 2 - 26, 18, btw + 52, 40);
@@ -4221,7 +4239,7 @@ export function initCockpit(G) {
     // 'Arrive in' — sentence case per ref-1's tag (caps live in toasts)
     ctx.font = FONT('500', 26);
     ctx.fillStyle = 'rgba(226,233,238,0.62)';
-    ctx.fillText('Arrive in', w / 2 - 78, 218);
+    ctx.fillText('Arrival in', w / 2 - 78, 218);
     ctx.font = FONT('600', 32);
     glowText(ctx, `${hh}:${mm}:${ss}`, w / 2 + 62, 218, WHITE, 5);
     ctx.textAlign = 'left';
@@ -4236,12 +4254,12 @@ export function initCockpit(G) {
       // ref-5 top-right, verbatim grammar: both lines WHITE, value bold
       ctx.textAlign = 'right';
       ctx.font = FONT('600', 34);
-      glowText(ctx, `Thermal Load:  ${(G.player.heat * 100) | 0}%`, w - 24, 54, WHITE, 7);
+      glowText(ctx, `Phaser Temp:  ${(G.player.heat * 100) | 0}%`, w - 24, 54, WHITE, 7);
       ctx.font = FONT('600', 28);
       // r15: same gate, same reason — at heatCap 1 (every posed moment) this
       // renders the round-14 string unchanged.
       const tcap = G.player.heatCap || 1;
-      glowText(ctx, tcap > 1 ? `Photon Cannon MK ${ROMAN[G.player.cannonMk] || G.player.cannonMk}` : 'Photon Cannon',
+      glowText(ctx, tcap > 1 ? `Phaser Banks MK ${ROMAN[G.player.cannonMk] || G.player.cannonMk}` : 'Phaser Banks',
         w - 24, 94, 'rgba(240,243,246,0.78)', 6);
       ctx.textAlign = 'left';
       microLabel(ctx, 24, 92, 'THR-04');
@@ -4295,8 +4313,8 @@ export function initCockpit(G) {
       // R9 (defect 5): the centre warpcard owns destination name + distance
       // + ETA now — repeating the system name here was exactly the "same
       // info across panels" tell. This housing keeps only the drive status.
-      hudLabel(ctx, 'hyperdrive', 24, 56, 15);
-      microLabel(ctx, 24, 94, `CLASS ${destClassNow()} · ${G.state === 'warp' ? 'IN TRANSIT' : 'SPOOLING'}`);
+      hudLabel(ctx, 'warp drive', 24, 56, 15);
+      microLabel(ctx, 24, 94, `WARP FACTOR ${warpFactorNow()} · ${G.state === 'warp' ? 'IN TRANSIT' : 'SPOOLING'}`);
     } else {
       // cruise / planet: current system, sparse — white title, dim subline.
       // R9 (defect 5): planet-mode subline dropped — the planet name is the
@@ -4307,7 +4325,7 @@ export function initCockpit(G) {
       if (G.mode !== 'planet') {
         ctx.fillStyle = WHITE_DIM;
         ctx.font = FONT('500', 22);
-        ctx.fillText('Deep Space', 24, 94);
+        ctx.fillText('Sector Space', 24, 94);
       } else {
         // on the surface NMS surfaces environment data (r9 critic: the
         // one-word panel was 80% empty black) — quiet hazard readouts
@@ -4320,7 +4338,7 @@ export function initCockpit(G) {
       }
     }
     ctx.textAlign = 'right';
-    microLabel(ctx, w - 26, 100, 'COM 7', 13);
+    microLabel(ctx, w - 26, 100, 'LCARS 7', 13);
     ctx.textAlign = 'left';
     screenGlass(ctx, w, h, t, 8);
   }
@@ -4411,10 +4429,10 @@ export function initCockpit(G) {
         x += ctx.measureText(sg.t).width;
       }
     };
-    rowRight(44, [{ t: 'Starship Combat Alert', c: '#ffb545', font: FONT('600', 28) }]);
+    rowRight(44, [{ t: 'Red Alert · Hostiles Inbound', c: '#ffb545', font: FONT('600', 28) }]);
     rowRight(96, [
-      { t: 'SHIELD LOW!', c: '#ff8060' },
-      { t: ' Recharge in Quick Menu' },
+      { t: 'SHIELDS LOW!', c: '#ff8060' },
+      { t: ' Route power to shields' },
     ]);
     rowRight(140, [
       { t: 'Use ' }, { t: 'Brake', c: '#d8e070' }, { t: ' ' }, { glyph: 'stick' },

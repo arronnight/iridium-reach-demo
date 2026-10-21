@@ -1,0 +1,230 @@
+{
+  "wave-incoming": [
+    {
+      "file": "wave-incoming.mp3",
+      "text": "Hello Captain. Incoming enemy vessels. Red alert. Do try not to redecorate the cockpit with panic."
+    },
+    {
+      "file": "wave-incoming-2.mp3",
+      "text": "Sensors are lighting up, Captain. Company's coming, and they haven't brought a bottle."
+    },
+    {
+      "file": "wave-incoming-3.mp3",
+      "text": "Multiple hostiles inbound. I'd suggest evasive manoeuvres, or at the very least a stiff upper lip."
+    }
+  ],
+  "shield-low": [
+    {
+      "file": "shield-low.mp3",
+      "text": "Umm, Captain. Your shields are very low. It's going to take more than harsh language and coffee to get out of this one."
+    },
+    {
+      "file": "shield-low-2.mp3",
+      "text": "Shields at critical, Captain. I'm not saying panic, but the escape pod is asking questions."
+    },
+    {
+      "file": "shield-low-3.mp3",
+      "text": "That shield readout is doing an impression of my will to live. Dwindling, Captain."
+    }
+  ],
+  "shield-down": [
+    {
+      "file": "shield-down.mp3",
+      "text": "Shields have packed it in entirely. From here on, the hull is doing the negotiating."
+    },
+    {
+      "file": "shield-down-2.mp3",
+      "text": "Shields gone, Captain. We are now what the manual calls 'delightfully vulnerable'."
+    },
+    {
+      "file": "shield-down-3.mp3",
+      "text": "The shield generator is on a tea break. Indefinitely. Do fly accordingly."
+    }
+  ],
+  "hull-critical": [
+    {
+      "file": "hull-critical.mp3",
+      "text": "Hull integrity in single digits, Captain. I've taken the liberty of drafting your eulogy — it's rather good, actually."
+    },
+    {
+      "file": "hull-critical-2.mp3",
+      "text": "The hull is now more philosophy than metal, Captain. Tread gently."
+    },
+    {
+      "file": "hull-critical-3.mp3",
+      "text": "Structural integrity failing. If you have a lucky charm, now is the moment to rub it vigorously."
+    }
+  ],
+  "kill": [
+    {
+      "file": "kill-1.mp3",
+      "text": "Nice shot, Captain. Reminds me of my days in the gamma quadrant — those blighters didn't stand a chance either."
+    },
+    {
+      "file": "kill-2.mp3",
+      "text": "Direct hit. I'll deduct it from the ammunition invoice with a small tear of pride."
+    },
+    {
+      "file": "kill-3.mp3",
+      "text": "Another one down, Captain. At this rate they'll name a very small moon after you."
+    },
+    {
+      "file": "kill-4.mp3",
+      "text": "Splendid violence, Captain. I felt that one through the chassis."
+    }
+  ],
+  "wave-cleared": [
+    {
+      "file": "wave-cleared.mp3",
+      "text": "Wave dispatched. I'd applaud, Captain, but someone welded my hands into the dashboard at the factory."
+    },
+    {
+      "file": "wave-cleared-2.mp3",
+      "text": "Sector clear. Pop the kettle on — we've earned four minutes of peace."
+    },
+    {
+      "file": "wave-cleared-3.mp3",
+      "text": "All hostiles dispatched. I've updated your personnel file: menace, surprisingly competent."
+    }
+  ],
+  "gunship": [
+    {
+      "file": "gunship.mp3",
+      "text": "Careful, Captain — that one's a gunship. Slow, angry, and it hits like a bailiff."
+    },
+    {
+      "file": "gunship-2.mp3",
+      "text": "Gunship on scope, Captain. Big, slow, and carrying enough ordnance to ruin a small planet's afternoon."
+    },
+    {
+      "file": "gunship-3.mp3",
+      "text": "Heavy inbound. That thing's armour has armour. Aim for the glowy bits."
+    }
+  ],
+  "overheat": [
+    {
+      "file": "overheat.mp3",
+      "text": "Cannon's overheating, Captain. It needs a moment. Perhaps use the time to reflect on your aim."
+    },
+    {
+      "file": "overheat-2.mp3",
+      "text": "Cannon thermal limit reached. Even weapons of war need a breather, Captain."
+    },
+    {
+      "file": "overheat-3.mp3",
+      "text": "You've cooked the photon cannon again. It is not a kettle, Captain."
+    }
+  ],
+  "warp-charge": [
+    {
+      "file": "warp-charge.mp3",
+      "text": "Spooling the hyperdrive. Kindly keep arms, legs, and existential dread inside the vehicle."
+    },
+    {
+      "file": "warp-charge-2.mp3",
+      "text": "Hyperdrive charging. Next stop: somewhere statistically worse."
+    },
+    {
+      "file": "warp-charge-3.mp3",
+      "text": "Warp coils spinning up. Try not to think about what happens to your molecules."
+    }
+  ],
+  "arrival": [
+    {
+      "file": "arrival.mp3",
+      "text": "Welcome to the new system, Captain. Statistically lovelier than the last one, and considerably better armed."
+    },
+    {
+      "file": "arrival-2.mp3",
+      "text": "Arrival complete, Captain. New system, same old hostility."
+    },
+    {
+      "file": "arrival-3.mp3",
+      "text": "We've arrived. Scanners detect minerals, mystery, and things that want you dead. The usual."
+    }
+  ],
+  "asteroid-nearmiss": [
+    {
+      "file": "asteroid-nearmiss.mp3",
+      "text": "Asteroid, Captain! They're the large grey things. Famously solid."
+    },
+    {
+      "file": "asteroid-nearmiss-2.mp3",
+      "text": "That rock was closer than my last performance review, Captain."
+    },
+    {
+      "file": "asteroid-nearmiss-3.mp3",
+      "text": "Asteroid off the port bow! And the starboard. Honestly, they're everywhere. It's a field."
+    }
+  ],
+  "game-start": [
+    {
+      "file": "game-start.mp3",
+      "text": "Morning, Captain. All systems nominal, kettle's on, and the vacuum of space remains reassuringly indifferent to your survival."
+    },
+    {
+      "file": "game-start-2.mp3",
+      "text": "Systems online. The coffee is hypothetical, the dangers are not. Good hunting, Captain."
+    },
+    {
+      "file": "game-start-3.mp3",
+      "text": "Good day, Captain. All diagnostics green, which historically means nothing."
+    }
+  ],
+  "game-over": [
+    {
+      "file": "game-over.mp3",
+      "text": "Well. That could have gone better. Shall we tell the insurance people it was meteorites?"
+    },
+    {
+      "file": "game-over-2.mp3",
+      "text": "Ship's destroyed, Captain. On the bright side, the insurance premium dies with us."
+    },
+    {
+      "file": "game-over-3.mp3",
+      "text": "And that, Captain, is why we don't fly into the shooty things. Care to try again?"
+    }
+  ],
+  "restart": [
+    {
+      "file": "restart.mp3",
+      "text": "Back from the dead, are we? Marvellous. I've reset the scoreboard and lowered my expectations accordingly."
+    },
+    {
+      "file": "restart-2.mp3",
+      "text": "Resurrection complete. Try to keep this hull slightly longer than the last one."
+    },
+    {
+      "file": "restart-3.mp3",
+      "text": "Fresh ship, fresh start, same questionable piloting. Welcome back, Captain."
+    }
+  ],
+  "high-score": [
+    {
+      "file": "high-score.mp3",
+      "text": "A new personal best, Captain! Somewhere in the gamma quadrant, a rival is weeping into their rations."
+    },
+    {
+      "file": "high-score-2.mp3",
+      "text": "New record, Captain! I've broadcast it to the fleet. Modesty was never one of my subroutines."
+    },
+    {
+      "file": "high-score-3.mp3",
+      "text": "Top score! If I had a hat, Captain, it would be off."
+    }
+  ],
+  "cannon-upgrade": [
+    {
+      "file": "cannon-upgrade.mp3",
+      "text": "Cannon upgrade installed, Captain. By jolly, you needed it."
+    },
+    {
+      "file": "cannon-upgrade-2.mp3",
+      "text": "I've upgraded the cannon's heat sinks. Do try to hit things for longer now."
+    },
+    {
+      "file": "cannon-upgrade-3.mp3",
+      "text": "Weapons refit complete. The cannon now tolerates your enthusiasm considerably longer."
+    }
+  ]
+}

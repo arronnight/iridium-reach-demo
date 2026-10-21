@@ -7,12 +7,12 @@ import * as THREE from 'three';
 const BOLT_SPEED = 620;
 const ENEMY_BOLT_SPEED = 420;
 
-// hostile ship naming — NMS combat HUD shows the locked target's name over
+// hostile ship naming — the combat HUD shows the locked target's name over
 // its health readout; cockpit.js reads these via G.target.
-// Faction-functional grammar ("Outlaw Interceptor", "Pirate Marauder") —
-// r3 critics flagged "Marauder Dropship" as wrong-voiced for NMS.
-const RAIDER_A = ['Outlaw', 'Pirate', 'Corsair', 'Marauder', 'Renegade', 'Rogue'];
-const RAIDER_B = ['Interceptor', 'Marauder', 'Raider', 'Reaver', 'Strafer', 'Cutter', 'Gunship', 'Skiff'];
+// Faction-functional grammar ("Klingon Bird-of-Prey", "Romulan Scout") for the
+// Star Trek reskin.
+const RAIDER_A = ['Klingon', 'Klingon', 'Romulan', 'Klingon', 'Romulan', 'Klingon'];
+const RAIDER_B = ['Bird-of-Prey', 'Attack Cruiser', 'Raider', 'Interceptor', 'Battlecruiser', 'Skiff'];
 
 // ---------- enemy behavioural classes (r9, re-tuned r10) ----------
 // Distinct movement/damage signatures layered over the cosmetic hull
@@ -70,8 +70,8 @@ const GUNSHIP_STANDOFF = 300;  // station radius it holds off the intercept poin
 // class-consistent second name word (index reuses the seeded draw so rng
 // consumption is identical for every class — determinism guard)
 const CLASS_NAMES = {
-  interceptor: ['Interceptor', 'Strafer'],
-  gunship: ['Gunship', 'Cutter'],
+  interceptor: ['Scout', 'Bird-of-Prey', 'Interceptor'],
+  gunship: ['Battlecruiser', 'Warbird', 'Dreadnought'],
 };
 
 // ---------- DIFFICULTY CURVE (r9) ----------
@@ -132,11 +132,12 @@ const FIGHTER_VARIANTS = 4;
 // vary the wing paint itself, not just the trim:
 //   v0 classic green + crimson   v1 olive + burnt orange
 //   v2 BONE/cream + green trim   v3 deep green + oxblood
+// wave palette: Klingon olive/bronze and Romulan grey-green over gunmetal
 const SCHEMES = [
-  { wing: 0x3e8a4c, trim: 0x549e62, accent: 0xd8502a, stripe: 0xc4ead0 },
-  { wing: 0x5d8a3e, trim: 0x74a052, accent: 0xe07830, stripe: 0xd8e4c2 },
-  { wing: 0xcfc9b0, trim: 0xe0dcc8, accent: 0x3e8a4c, stripe: 0xd8502a },
-  { wing: 0x2f7a44, trim: 0x479258, accent: 0xb43838, stripe: 0xc4ead0 },
+  { wing: 0x4a5a36, trim: 0x6a7a4a, accent: 0x8a3a22, stripe: 0xb8c890 },
+  { wing: 0x3e4a46, trim: 0x586a62, accent: 0x2f6a4a, stripe: 0xa0c0b0 },
+  { wing: 0x6a6a62, trim: 0x8a8a80, accent: 0x6a2a2a, stripe: 0xc8c8b8 },
+  { wing: 0x35492f, trim: 0x4e6644, accent: 0x7a4a20, stripe: 0xb8c8a0 },
 ];
 
 // taper a box along `axis` ('x' spanwise wing / 'y' vertical fin): chord (z)
@@ -464,8 +465,14 @@ export function initFlight(G) {
 
   const MAXV = { cruise: 150, boost: 320 };
   let fireCooldown = 0;
+  let torpedoCd = 0;
   let muzzleSide = 1;
   let lastFireT = -9;
+  player.torpedoCd = 0;
+  player.torpedoMax = 3.2;
+  player.torpedoLevel = 1;
+  player.torpedoDamageMul = 1;
+  player.credits = 0;
 
   // ================= cannon heat upgrade (r15) =================
   // THE PROBLEM, in Jason's words: the photon cannon overheats too fast in
@@ -510,6 +517,14 @@ export function initFlight(G) {
     G.telemetryData.cannonMk = player.cannonMk;
     G.telemetryData.cannonHeatCap = player.heatCap;
     G.telemetryData.cannonUpgrades++;
+    return true;
+  }
+
+  function upgradeTorpedo() {
+    if (player.torpedoLevel >= 4) return false;
+    player.torpedoLevel++;
+    player.torpedoMax = Math.max(1.6, TORPEDO_COOLDOWN - (player.torpedoLevel - 1) * 0.4);
+    player.torpedoDamageMul = 1 + (player.torpedoLevel - 1) * 0.25;
     return true;
   }
 
@@ -806,8 +821,8 @@ export function initFlight(G) {
       vel: new THREE.Vector3(), hp: 100, maxHp: 100,
       state: 'pursuit', stateT: 0, fireT: 0, aimErr: 0.06,
       evadeDir: new THREE.Vector3(), orbitOffset: new THREE.Vector3(), orbitT: 0,
-      frozen: false, scriptFire: 0, boltColor: 0x30f0ff, scriptAimOffset: null,
-      name: 'Outlaw Interceptor',
+      frozen: false, scriptFire: 0, boltColor: 0x66ff55, scriptAimOffset: null,
+      name: 'Klingon Bird-of-Prey',
     });
   }
 
@@ -964,6 +979,10 @@ export function initFlight(G) {
     const cls = en.cls || 'raider';
     const pts = Math.round(ENEMY_CLASSES[cls].points * (1 + G.systemIndex * 0.5));
     G.telemetryData.score += pts;
+    const credits = Math.round(ENEMY_CLASSES[cls].points * 0.22 * (1 + G.systemIndex * 0.25));
+    player.credits += credits;
+    G.telemetryData.credits = player.credits;
+    G.telemetryData.creditsEarned += credits;
     const s = cstat(cls);
     s.killed++;
     s.points += pts;
@@ -983,8 +1002,10 @@ export function initFlight(G) {
     // name: same two seeded draws for every class (determinism guard); the
     // second word swaps to a class-consistent one via the SAME drawn index
     const bIdx = (rng() * RAIDER_B.length) | 0;
-    const bWord = CLASS_NAMES[clsName] ? CLASS_NAMES[clsName][bIdx % 2] : RAIDER_B[bIdx];
-    en.name = RAIDER_A[(rng() * RAIDER_A.length) | 0] + ' ' + bWord;
+    const aIdx = (rng() * RAIDER_A.length) | 0;
+    const classWords = CLASS_NAMES[clsName];
+    const bWord = classWords ? classWords[bIdx % classWords.length] : RAIDER_B[bIdx];
+    en.name = RAIDER_A[aIdx] + ' ' + bWord;
     en.glowL.scale.set(4.5, 4.5, 1); // poses may enlarge; live spawns reset
     en.glowR.scale.set(4.5, 4.5, 1);
     en.pos.copy(pos);
@@ -1005,7 +1026,9 @@ export function initFlight(G) {
     en.burning = false;
     en.burnT = 1.0; // first siege burn is available a second after arrival
     en.hitR = 14 * ((cls.scale[0] + cls.scale[1] + cls.scale[2]) / 3) / 2.6;
-    en.boltColor = clsName === 'gunship' ? 0xff8c30 : 0x30f0ff; // heavy shot reads warm
+    en.boltColor = clsName === 'gunship' ? 0xff7a22
+      : clsName === 'interceptor' ? 0x66ffb0
+      : 0x66ff55; // Klingon/Romulan disruptors run green
     en.mesh.scale.set(cls.scale[0], cls.scale[1], cls.scale[2]);
     en.state = 'pursuit';
     en.stateT = 0;
@@ -1204,8 +1227,46 @@ export function initFlight(G) {
   }
 
   const _direct = new THREE.Vector3(), _intercept = new THREE.Vector3();
+  const _torpDir = new THREE.Vector3(), _torpMuzzle = new THREE.Vector3();
   const COS_3DEG = Math.cos(3 * Math.PI / 180);     // fire dir must land this close to the intercept
   const COS_1_5DEG = Math.cos(1.5 * Math.PI / 180); // and intercept must differ from the direct line
+
+  // Photon torpedo: a slow, heavy secondary weapon on a shared cooldown.
+  // Phaser banks stay the sustained-fire weapon; the torpedo is the alpha
+  // strike, with splash damage for clustered hostiles.
+  const TORPEDO_SPEED = 340;
+  const TORPEDO_COOLDOWN = 3.2;
+  const TORPEDO_DAMAGE = 190;
+  const TORPEDO_SPLASH = 72;
+  const TORPEDO_SPLASH_DAMAGE = 70;
+
+  function playerTorpedo() {
+    if (G.state === 'destroyed') return false;
+    if (torpedoCd > 0) return false;
+    torpedoCd = player.torpedoMax || TORPEDO_COOLDOWN;
+    player.torpedoCd = torpedoCd;
+    _fwd.set(0, 0, -1).applyQuaternion(player.quat);
+    _torpMuzzle.copy(player.pos)
+      .addScaledVector(_fwd, 2.5)
+      .addScaledVector(_tmp.set(0, 1, 0).applyQuaternion(player.quat), -2.4);
+    _torpDir.copy(_fwd);
+    const vel = _tmp.copy(_torpDir).multiplyScalar(TORPEDO_SPEED).add(player.vel);
+    const b = G.vfx.fireBolt(_torpMuzzle, vel, 0xff5a1e, 'player', 3.6);
+    if (b) {
+      b.dmg = TORPEDO_DAMAGE * player.torpedoDamageMul;
+      b.splashDmg = TORPEDO_SPLASH_DAMAGE * player.torpedoDamageMul;
+      b.torpedo = true;
+      b.life = 4.0;
+    }
+    player.heat = Math.min(1, player.heat + 0.16);
+    if (player.heat >= 1) {
+      player.overheated = true;
+      G.audio.overheat();
+      G.audio.say && G.audio.say('overheat');
+    }
+    G.audio.laser();
+    return true;
+  }
 
   function enemyFire(en, target, lead) {
     _muzzle.copy(en.pos).addScaledVector(_tmp.set(0, 0, -1).applyQuaternion(en.quat), 6);
@@ -1465,7 +1526,17 @@ export function initFlight(G) {
           if (!en.alive || en.frozen) continue; // frozen = posed for a capture; hp stays as posed
           if (segmentSphere(b.prev, b.pos, en.pos, en.hitR || 14)) {
             b.active = false;
-            damageEnemy(en, 34, b.pos);
+            damageEnemy(en, b.dmg || 34, b.pos);
+            if (b.torpedo) {
+              G.vfx.explode(b.pos, 1.8);
+              G.audio.explosion && G.audio.explosion();
+              for (const nearby of enemies) {
+                if (!nearby.alive || nearby.frozen || nearby === en) continue;
+                if (nearby.pos.distanceTo(b.pos) <= TORPEDO_SPLASH) {
+                  damageEnemy(nearby, b.splashDmg || TORPEDO_SPLASH_DAMAGE, nearby.pos);
+                }
+              }
+            }
             break;
           }
         }
@@ -1746,6 +1817,8 @@ export function initFlight(G) {
       if (player.overheated && player.heat <= 0.35) player.overheated = false;
     }
     fireCooldown -= dt;
+    if (torpedoCd > 0) torpedoCd = Math.max(0, torpedoCd - dt);
+    player.torpedoCd = torpedoCd;
 
     // shield regen after 5s without damage
     if (player.shield < 100 && G.time - player.lastDamageT > 5) {
@@ -1820,6 +1893,7 @@ export function initFlight(G) {
     // only the arena's --tuning path writes, and it says so in its output.
     classes: ENEMY_CLASSES,
     playerFire,
+    playerTorpedo,
     spawnEnemy,
     startWave,
     damagePlayer,
@@ -1829,6 +1903,7 @@ export function initFlight(G) {
     // can MEASURE time-to-overheat per mark instead of recomputing the formula
     // in the instrument and calling that a measurement.
     grantCannonUpgrade,
+    upgradeTorpedo,
     cannonHeat: { HEAT_PER_SHOT, HEAT_CAP_MAX },
     refreshHp: drawHp,
     aliveCount,
@@ -1908,6 +1983,10 @@ export function initFlight(G) {
         const bonus = Math.round(200 * (1 + G.systemIndex * 0.5));
         G.telemetryData.score += bonus;
         G.telemetryData.waveBonusTotal += bonus;
+        const credits = Math.round(90 * (1 + G.systemIndex * 0.35));
+        player.credits += credits;
+        G.telemetryData.credits = player.credits;
+        G.telemetryData.creditsEarned += credits;
         G.telemetryData.wavesCleared++;
         // r15: the wave clear is what pays for the cannon upgrade.
         const upgraded = grantCannonUpgrade();
@@ -2005,6 +2084,7 @@ export function initFlight(G) {
       checkHits();
       updateTarget();
       if (G.input.fire) playerFire(G.autopilot ? G.autopilot.aimDir : null);
+      if (G.input.torpedo) playerTorpedo();
     },
   };
   G.flight = F;

@@ -3,6 +3,7 @@
 // and the scripted autopilot session (?session=1).
 import * as THREE from 'three';
 import { initPost } from './post.js';
+import { initStation } from './station.js';
 import { initAudio } from './audio.js';
 import { initSpace } from './space.js';
 import { initPlanet } from './planet.js';
@@ -58,17 +59,30 @@ function strHash(s) {
   return h >>> 0;
 }
 
-// ---------------- name generator ----------------
+// ---------------- name generator (Starfleet / Star Trek) ----------------
 const SYL_A = ['Ga', 'Uk', 'Pe', 'Vo', 'Ny', 'Ze', 'Ta', 'Ori', 'Kel', 'Ha', 'Iri', 'Mo', 'Su', 'Ren'];
 const SYL_B = ['dis', 'ubu', 'hae', 'ran', 'lo', 'mir', 'ket', 'va', 'dun', 'shi', 'gor', 'nal'];
-const SYL_C = ['Beta', 'Prime', 'Major', 'IX', 'VII', 'Minor', 'Reach', 'Expanse', 'III', 'Sigma'];
-const SHIP_A = ['Golden', 'Crimson', 'Silent', 'Radiant', 'Umber', 'Azure', 'Solar', 'Feral'];
-const SHIP_B = ['Vector', 'Pride', 'Lance', 'Harrier', 'Songbird', 'Talon', 'Meridian', 'Wake'];
+const SECTOR_NAMES = [
+  'Khitomer', 'Bajor', 'Cardassia', "Qo'noS", 'Romulus', 'Vulcan', 'Andoria', 'Risa',
+  'Betazed', 'Bolarus', 'Ceti Alpha', 'Wolf 359', 'Setlik', 'Lantaru', 'Galorndon',
+  'Korvat', 'Deneva', 'Argelius', 'Tellar', 'Coridan',
+];
+const SECTOR_SUFFIX = ['Sector', 'Sector', 'Sector', 'Sector', 'Expanse', 'Reach', 'Nebula'];
+const SHIP_NAMES = [
+  'Iridium', 'Akira', 'Reliant', 'Grissom', 'Yamato', 'Hood', 'Excalibur', 'Exeter',
+  'Lexington', 'Saratoga', 'Republic', 'Potemkin', 'Bozeman', 'Endeavour', 'Valiant',
+  'Concord', 'Dauntless', 'Intrepid', 'Discovery', 'Cerritos',
+];
 function genSystemName(rng) {
-  return SYL_A[(rng() * SYL_A.length) | 0] + SYL_B[(rng() * SYL_B.length) | 0] + ' ' + SYL_C[(rng() * SYL_C.length) | 0];
+  return SECTOR_NAMES[(rng() * SECTOR_NAMES.length) | 0] + ' ' + SECTOR_SUFFIX[(rng() * SECTOR_SUFFIX.length) | 0];
 }
 function genPlanetName(rng) {
   return SYL_A[(rng() * SYL_A.length) | 0] + SYL_B[(rng() * SYL_B.length) | 0] + SYL_B[(rng() * SYL_B.length) | 0];
+}
+function genShipName(rng) {
+  const name = SHIP_NAMES[(rng() * SHIP_NAMES.length) | 0];
+  const registry = 1701 + ((rng() * 7800) | 0);
+  return `U.S.S. ${name} NCC-${registry}`;
 }
 
 // ---------------- renderer / scene / camera ----------------
@@ -107,6 +121,7 @@ const G = {
   rngFor: (name) => mulberry32((SEED * 2654435761 + strHash(name)) >>> 0),
   state: 'cruise',
   mode: 'space',           // 'space' | 'planet'
+  safeSystem: false,
   systemIndex: 0,
   momentMode: MOMENT > 0,
   autopilot: null,
@@ -115,12 +130,12 @@ const G = {
   warpEta: 0,    // seconds until warp exit (counts down through warp-charge + warp)
   target: null,  // nearest alive hostile: { name, hp, maxHp } — null when clear
   poseSway: false, // moment poses: deterministic micro-sway on the camera
-  input: { pitch: 0, yaw: 0, roll: 0, thrust: 0.6, boost: false, brake: false, fire: false },
+  input: { pitch: 0, yaw: 0, roll: 0, thrust: 0.6, boost: false, brake: false, fire: false, torpedo: false },
   player: {
     pos: new THREE.Vector3(0, 0, 0),
     quat: new THREE.Quaternion(),
   },
-  names: { system: '', nextSystem: '', planet: '', ship: '' },
+  names: { system: '', nextSystem: '', planet: '', ship: '', registry: '' },
   telemetryData: {
     wave: 0, shotsFired: 0, hitsRegistered: 0, enemiesKilled: 0,
     enemyShotsFired: 0, enemyEvadeEvents: 0, enemyLeadShots: 0,
@@ -128,6 +143,7 @@ const G = {
     boostSeconds: 0, brakeTurns: 0, waveStats: [],
     // r9 gameplay-systems package
     score: 0, deaths: 0, wavesCleared: 0, waveBonusTotal: 0,
+    credits: 0, creditsEarned: 0, creditsSpent: 0,
     enemyClassStats: {},
     // r10: death has a score consequence wherever the run continues
     // (soft-respawn only — see flight.damagePlayer + DECISIONS-gameplay.md)
@@ -157,7 +173,8 @@ if (!HARNESS) {
   G.names.system = genSystemName(nrng);
   G.names.nextSystem = genSystemName(nrng);
   G.names.planet = genPlanetName(nrng);
-  G.names.ship = SHIP_A[(nrng() * SHIP_A.length) | 0] + ' ' + SHIP_B[(nrng() * SHIP_B.length) | 0];
+  G.names.ship = genShipName(nrng);
+  G.names.registry = (G.names.ship.match(/NCC-\d+/) || [''])[0];
 }
 
 // ---------------- subsystems ----------------
@@ -168,7 +185,11 @@ initVfx(G);
 initFlight(G);
 initCockpit(G);
 initPost(G);
+initStation(G);
 
+G.isSafeSystem = (i) => i > 0 && i % 2 === 1;
+G.safeSystem = G.isSafeSystem(0);
+G.station.setSystem(0, G.safeSystem);
 G.space.setSystem(0);
 G.planet.setSystem(0);
 let planetSysNow = 0; // which system the planet subsystem currently holds (prewarm restore)
@@ -322,15 +343,21 @@ const SM = {
     if (!b.spaceDone) G.space.setSystem(b.sys);
     SM.build = null;
   },
+  beginWarp() {
+    if (G.mode !== 'space') return false;
+    if (G.state === 'warp' || G.state === 'warp-charge' || G.state === 'arrive') return false;
+    SM.set('warp-charge', 3.5);
+    const nrng = G.rngFor('names' + (G.systemIndex + 1));
+    G.names.nextSystem = genSystemName(nrng);
+    G.audio.warpSwell();
+    G.audio.say && G.audio.say('warp-charge');
+    SM.beginSystemBuild(G.systemIndex + 1);
+    return true;
+  },
   handleWaveEnd(baseState) {
     G.flight.endWave();
     if (G.mode === 'space') {
-      SM.set('warp-charge', 3.5);
-      const nrng = G.rngFor('names' + (G.systemIndex + 1));
-      G.names.nextSystem = genSystemName(nrng);
-      G.audio.warpSwell();
-      G.audio.say && G.audio.say('warp-charge');
-      SM.beginSystemBuild(G.systemIndex + 1);
+      SM.beginWarp();
     } else {
       SM.set(baseState);
       SM.freeWaveTimer = 25;
@@ -350,7 +377,7 @@ const SM = {
       case 'cruise':
       case 'planet':
         if (F.aliveCount() > 0 || (F.wave.active && F.wave.toSpawn > 0)) { SM.set('combat'); break; }
-        if (!SCRIPTED) {
+        if (!SCRIPTED && !G.safeSystem) {
           SM.freeWaveTimer -= dt;
           if (SM.freeWaveTimer <= 0) {
             F.startWave(F.wave.num + 1);
@@ -399,6 +426,9 @@ const SM = {
           SM.finishSystemBuild(); // usually a no-op: staged during the tunnel
           G.player.pos.set(G.systemIndex * 40000, 0, 0);
           G.player.vel && G.player.vel.set(0, 0, 0);
+          G.safeSystem = G.isSafeSystem(G.systemIndex);
+          G.station.setSystem(G.systemIndex, G.safeSystem);
+          if (G.safeSystem) G.flight.clearEnemies();
           G.post.whiteout = 1;
           SM.set('arrive', 2.5);
           G.audio.say && G.audio.say('arrival');   // r15
@@ -456,18 +486,40 @@ const SM = {
   },
 };
 
+G.requestJump = () => {
+  if (!G.safeSystem || G.uiHold || G.mode !== 'space') return false;
+  if (G.state !== 'cruise') return false;
+  return SM.beginWarp();
+};
+
 // ---------------- input ----------------
 const keys = {};
 window.addEventListener('keydown', (e) => { keys[e.code] = true; });
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-let mouseDX = 0, mouseDY = 0, mouseDown = false;
-renderer.domElement.addEventListener('mousedown', () => {
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || G.uiHold || !G.safeSystem || G.mode !== 'space') return;
+  if (e.code === 'KeyE' && G.station && G.station.canDock() && G.openDock) {
+    e.preventDefault();
+    G.openDock();
+  } else if (e.code === 'KeyJ') {
+    e.preventDefault();
+    G.requestJump();
+  }
+});
+let mouseDX = 0, mouseDY = 0, mouseDown = false, mouseRDown = false;
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+renderer.domElement.addEventListener('mousedown', (e) => {
+  if (e.button === 2) { mouseRDown = true; return; }
+  if (e.button !== 0) return;
   mouseDown = true;
   if (!SESSION && !MOMENT && document.pointerLockElement !== renderer.domElement) {
     renderer.domElement.requestPointerLock?.();
   }
 });
-window.addEventListener('mouseup', () => { mouseDown = false; });
+window.addEventListener('mouseup', (e) => {
+  if (e.button === 2) { mouseRDown = false; return; }
+  mouseDown = false;
+});
 window.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement === renderer.domElement) {
     mouseDX += e.movementX; mouseDY += e.movementY;
@@ -492,6 +544,7 @@ function pollInput(dt) {
   inp.boost = !!keys.ShiftLeft || !!keys.ShiftRight;
   inp.brake = !!keys.Space || !!keys.ControlLeft;
   inp.fire = mouseDown || !!keys.KeyF;
+  inp.torpedo = mouseRDown || !!keys.KeyQ;
 }
 
 // ---------------- autopilot (?session=1) ----------------
@@ -515,7 +568,7 @@ const autopilot = SCRIPTED ? {
     this.phaseT += dt;
     this.wobble += dt;
     this.burstT += dt;
-    inp.boost = false; inp.brake = false; inp.fire = false;
+    inp.boost = false; inp.brake = false; inp.fire = false; inp.torpedo = false;
     this.aimDir = null;
 
     const steerTo = (targetPos) => {
@@ -1041,6 +1094,7 @@ function tick(dt) {
     inp.pitch = inp.yaw = inp.roll = 0;
     inp.thrust = 0;
     inp.fire = inp.boost = inp.brake = false;
+    inp.torpedo = false;
   }
   // the autopilot stands down once the ship is a wreck (?autoplay=1 reaches
   // the destruction sequence — the input zeroing above must survive the tick)
@@ -1089,6 +1143,7 @@ function tick(dt) {
     G.flight.update(dt); sec(0);
     SM.update(dt); sec(1);
     G.space.update(dt, G.time); sec(2);
+    G.station.update(dt, G.time);
     G.planet.update(dt, G.time); sec(3);
     G.vfx.update(dt, G.time); sec(4);
     G.cockpit.update(dt, G.time); sec(5);
@@ -1320,6 +1375,9 @@ window.__telemetry = function () {
       // These fields are documented in HARNESS.md's telemetry schema block,
       // under the inline marker "r9 gameplay-systems additions:".
       score: T.score,
+      credits: T.credits,
+      creditsEarned: T.creditsEarned,
+      creditsSpent: T.creditsSpent,
       deaths: T.deaths,
       scoreLostToDeaths: T.scoreLostToDeaths,
       wavesCleared: T.wavesCleared,

@@ -10,6 +10,7 @@
 // hardware rather than a web rectangle.
 
 const TITLE = 'IRIDIUM REACH';
+const FRANCHISE = 'STAR TREK';
 const LS_KEY = 'iridium-reach.settings';
 const LS_HS = 'iridium-reach.highscore';
 const S_MIN = 0.3, S_MAX = 3.0;
@@ -268,8 +269,129 @@ export function initUI(G) {
   margin-top: 3px; font-size: 9px; font-weight: 600; letter-spacing: 0.22em;
   color: rgba(255,255,255,0.42);
 }
+#ir-hudscore .cred {
+  margin-top: 7px; padding-top: 4px;
+  border-top: 1px solid rgba(153,204,255,0.28);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
+  color: rgba(153,204,255,0.92);
+}
+#ir-dockprompt {
+  position: fixed; left: 50%; bottom: 42px; transform: translateX(-50%);
+  z-index: 31; pointer-events: none; text-align: center; user-select: none;
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", sans-serif;
+  color: #ffcc99; text-shadow: 0 0 14px rgba(0,0,0,0.9);
+}
+#ir-dockprompt b {
+  display: block; color: #ff9c00; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.32em; text-indent: 0.32em; text-transform: uppercase;
+}
+#ir-dockprompt span {
+  display: block; margin-top: 5px; padding: 6px 15px;
+  border: 1px solid rgba(255,156,0,0.55); background: rgba(0,0,0,0.62);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.20em; text-indent: 0.20em;
+  text-transform: uppercase;
+}
+#ir-dockprompt span i { font-style: normal; color: #99ccff; }
+#ir-ui #ir-dock { padding-top: 92px; }
+#ir-ui .ir-wallet {
+  display: flex; align-items: baseline; justify-content: space-between;
+  width: 100%; padding: 10px 16px; margin-bottom: 12px;
+  border-left: 6px solid #99ccff; background: rgba(153,204,255,0.08);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
+  color: #99ccff;
+}
+#ir-ui .ir-wallet b { font-size: 22px; letter-spacing: 0.08em; color: #ffcc99; }
+#ir-ui .ir-shop { display: flex; flex-direction: column; gap: 8px; }
+#ir-ui .ir-item {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 12px 10px 16px; border-left: 5px solid #ff9c00;
+  background: rgba(255,156,0,0.07);
+}
+#ir-ui .ir-item.off { opacity: 0.46; border-left-color: #555; }
+#ir-ui .ir-item .ir-copy { flex: 1; min-width: 0; }
+#ir-ui .ir-item .ir-name {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.10em;
+  color: #ffcc99; text-transform: uppercase;
+}
+#ir-ui .ir-item .ir-desc {
+  margin-top: 3px; font-size: 9px; font-weight: 600; letter-spacing: 0.16em;
+  color: rgba(153,204,255,0.78); text-transform: uppercase;
+}
+#ir-ui .ir-item .ir-buy {
+  min-width: 108px; padding: 9px 12px; border: 0; border-radius: 0 18px 18px 0;
+  background: #ff9c00; color: #000; cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+}
+#ir-ui .ir-item .ir-buy:disabled { background: #333; color: #777; cursor: default; }
+#ir-ui .ir-item .ir-buy:not(:disabled):hover { background: #ffcc99; }
+#ir-ui .ir-wallet.poor b { color: #ff6a4a; }
 `;
   document.head.appendChild(style);
+
+  // ---------------- LCARS skin ----------------
+  // The base sheet above keeps all layout behaviour; this layer re-skins it
+  // with the Starfleet LCARS grammar: black glass, signal-orange caps and
+  // rails, peach type, lavender/blue data accents.
+  const lcars = document.createElement('style');
+  lcars.textContent = `
+#ir-ui { font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", sans-serif; color: #ffcc99; }
+#ir-ui .ir-layer { background: radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.62) 58%, rgba(0,0,0,0.82) 100%); }
+#ir-ui .ir-panel { background: #000; border: 0; border-radius: 0 48px 0 0; box-shadow: 0 0 0 2px #ff9c00, 0 0 42px rgba(0,0,0,0.85); clip-path: none; padding-bottom: 26px; overflow: hidden; }
+#ir-ui .ir-panel::before { content: ''; position: absolute; left: 0; top: 52px; bottom: 26px; width: 10px; background: #ff9c00; pointer-events: none; }
+#ir-ui .ir-head { background: #ff9c00; border-bottom: 0; border-radius: 0 42px 0 0; padding: 10px 26px 10px 34px; }
+#ir-ui .ir-headtxt, #ir-ui .ir-headtxt b { color: #000; }
+#ir-ui .ir-headr { color: #000; opacity: 0.72; }
+#ir-ui .ir-leds i { background: #000; }
+#ir-ui .ir-leds i:nth-child(n+4) { opacity: 0.35; }
+#ir-ui .ir-body { padding: 26px 34px 0; }
+#ir-ui .ir-eyebrow { margin-bottom: 7px; font-size: 9px; font-weight: 700; letter-spacing: 0.42em; text-indent: 0.42em; color: #99ccff; text-transform: uppercase; }
+#ir-ui .ir-title { text-align: left; color: #ffcc99; font-size: 48px; letter-spacing: 0.05em; text-indent: 0; text-shadow: none; }
+#ir-ui .ir-sub { margin-top: 8px; text-align: left; color: #99ccff; letter-spacing: 0.20em; text-indent: 0.20em; }
+#ir-ui .ir-rule { height: 2px; margin: 20px 0 18px; background: linear-gradient(90deg, #ff9c00 0 28%, #cc99cc 28% 55%, #99ccff 55% 72%, transparent 72%); opacity: 0.9; }
+#ir-ui .ir-btn { width: 100%; border: 0; border-radius: 0 28px 28px 0; background: #ff9c00; color: #000; text-align: left; padding: 11px 18px 11px 44px; font-weight: 700; }
+#ir-ui .ir-btn i { color: #000; left: 18px; }
+#ir-ui .ir-btn:hover { background: #ffcc99; color: #000; }
+#ir-ui .ir-btn.primary { background: #cc99cc; color: #000; border: 0; box-shadow: none; font-size: 13px; padding: 16px 18px 16px 44px; }
+#ir-ui .ir-btn.primary i, #ir-ui .ir-btn.primary.pulse i { color: #000; }
+#ir-ui .ir-btn.primary.pulse { animation: none; }
+#ir-ui .ir-btn.active { background: #99ccff; color: #000; border: 0; }
+#ir-ui .ir-key { border: 0; border-left: 5px solid #ff9c00; background: #111; color: #99ccff; border-radius: 0 12px 12px 0; }
+#ir-ui .ir-act { color: #ffcc99; }
+#ir-ui .ir-foot { color: rgba(255,204,153,0.45); }
+#ir-ui .ir-foot b { color: #ff9c00; }
+#ir-ui .ir-lab { color: #99ccff; }
+#ir-ui .ir-lab .val { color: #ff9c00; }
+#ir-ui input.ir-range::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, #ff9c00, #cc99cc); }
+#ir-ui input.ir-range::-webkit-slider-thumb { background: #ff9c00; }
+#ir-ui input.ir-range::-moz-range-track { height: 4px; background: linear-gradient(90deg, #ff9c00, #cc99cc); }
+#ir-ui input.ir-range::-moz-range-thumb { background: #ff9c00; }
+#ir-ui .ir-seg { border: 0; background: #111; border-radius: 0 18px 18px 0; overflow: hidden; }
+#ir-ui .ir-seg button { color: #99ccff; }
+#ir-ui .ir-seg button + button { border-left: 1px solid #333; }
+#ir-ui .ir-seg button.on { background: #99ccff; color: #000; box-shadow: none; }
+#ir-ui .ir-stats .k { color: #99ccff; }
+#ir-ui .ir-stats .v { color: #ffcc99; font-family: "Arial Narrow", "Avenir Next Condensed", sans-serif; }
+#ir-ui .ir-newrec { border: 0; background: #ff9c00; color: #000; border-radius: 0 10px 10px 0; }
+#ir-hudscore { font-family: "Arial Narrow", "Avenir Next Condensed", sans-serif; }
+#ir-hudscore .lab { color: #ff9c00; }
+#ir-hudscore .val { color: #ffcc99; border-top-color: #ff9c00; }
+#ir-hudscore .best { color: #99ccff; }
+#ir-hudscore .cred { color: #99ccff; border-top-color: rgba(153,204,255,0.35); }
+#ir-ui .ir-wallet { background: #111; border-left-color: #99ccff; }
+#ir-ui .ir-wallet b { color: #ff9c00; }
+#ir-ui .ir-wallet.poor b { color: #ff5a3c; }
+#ir-ui .ir-item { background: #111; border-left-color: #ff9c00; }
+#ir-ui .ir-item .ir-name { color: #ffcc99; }
+#ir-ui .ir-item .ir-desc { color: #99ccff; }
+#ir-ui .ir-item .ir-buy { background: #ff9c00; color: #000; flex-shrink: 0; }
+#ir-ui .ir-item .ir-buy:disabled { background: #222; color: #666; }
+#ir-ui #ir-dock .ir-eyebrow { letter-spacing: 0.28em; text-indent: 0.28em; }
+#ir-ui #ir-dock .ir-sub { letter-spacing: 0.14em; text-indent: 0.14em; }
+#ir-ui #ir-dock .ir-item .ir-name { letter-spacing: 0.07em; }
+#ir-ui #ir-dock .ir-item .ir-desc { letter-spacing: 0.08em; line-height: 1.3; }
+`;
+  document.head.appendChild(lcars);
 
   // ---------------- DOM ----------------
   const root = document.createElement('div');
@@ -281,63 +403,84 @@ export function initUI(G) {
     </div>`;
   const key = (k) => `<span class="ir-key">${k}</span>`;
   const controlRows = [
-    [key('MOUSE') + key('HOLD LMB'), 'STEER &nbsp;&middot;&nbsp; FIRE'],
-    [key('W') + key('S'), 'THRUST &nbsp;&middot;&nbsp; BRAKE'],
+    [key('MOUSE') + key('HOLD LMB'), 'STEER &nbsp;&middot;&nbsp; PHASERS'],
+    [key('RMB') + key('Q'), 'PHOTON TORPEDO'],
+    [key('W') + key('S'), 'IMPULSE &nbsp;&middot;&nbsp; BRAKE'],
     [key('A') + key('D'), 'ROLL'],
     [key('ARROW KEYS'), 'PITCH &nbsp;&middot;&nbsp; YAW'],
-    [key('SHIFT'), 'BOOST'],
+    [key('SHIFT'), 'IMPULSE BOOST'],
     [key('SPACE') + key('CTRL'), 'BRAKE-TURN'],
-    [key('F'), 'FIRE'],
+    [key('F'), 'PHASERS'],
+    [key('E'), 'DOCK AT SAFE HAVEN'],
+    [key('J'), 'JUMP FROM SAFE HAVEN'],
     [key('ESC'), 'PAUSE'],
   ].map(([k, a]) => `<div class="ir-keys">${k}</div><div class="ir-act">${a}</div>`).join('');
 
   root.innerHTML = `
   <div class="ir-layer hidden" id="ir-start">
     <div class="ir-panel" style="width:690px">
-      ${head('<b>&#9632;</b> FLIGHT DECK &middot; PRE-LAUNCH', 'COM.7')}
+      ${head('<b>&#9632;</b> STARFLEET COMMAND &middot; MAIN BRIDGE', 'LCARS 47')}
       <div class="ir-body">
+        <div class="ir-eyebrow">${FRANCHISE} &middot; FAN TECH DEMO</div>
         <div class="ir-title">${TITLE}</div>
         <div class="ir-sub" id="ir-shipline"></div>
         <div class="ir-sub" id="ir-bestline" style="margin-top:5px"></div>
         <div class="ir-rule"></div>
         <div class="ir-controls">${controlRows}</div>
         <div class="ir-rule"></div>
-        <button class="ir-btn primary pulse" id="ir-fly"><i>&#8250;&#8250;</i>CLICK TO FLY</button>
-        <button class="ir-btn" id="ir-start-set"><i>&#8250;&#8250;</i>FLIGHT SETTINGS</button>
+        <button class="ir-btn primary pulse" id="ir-fly"><i>&#8250;&#8250;</i>TAKE THE CONN</button>
+        <button class="ir-btn" id="ir-start-set"><i>&#8250;&#8250;</i>SHIP SETTINGS</button>
         <div id="ir-start-settings-host"></div>
-        <div class="ir-foot">CLICK THE CANOPY TO LAUNCH &middot; <b>ESC</b> HOLDS FLIGHT IN-FLIGHT</div>
+        <div class="ir-foot">CLICK THE CANOPY TO ENGAGE &middot; <b>ESC</b> HOLDS THE BRIDGE</div>
       </div>
     </div>
   </div>
   <div class="ir-layer hidden" id="ir-pause">
     <div class="ir-panel" style="width:470px">
-      ${head('<b>&#9632;</b> ' + TITLE + ' &middot; FLIGHT SYSTEMS', 'HOLD')}
+      ${head('<b>&#9632;</b> STARFLEET COMMAND &middot; BRIDGE HOLD', 'HOLD')}
       <div class="ir-body">
-        <div class="ir-title" style="font-size:30px">FLIGHT HELD</div>
+        <div class="ir-title" style="font-size:32px">MAIN BRIDGE HOLD</div>
         <div class="ir-sub">SIMULATION SUSPENDED</div>
         <div class="ir-rule"></div>
-        <button class="ir-btn primary" id="ir-resume"><i>&#8250;&#8250;</i>RESUME FLIGHT</button>
-        <button class="ir-btn" id="ir-settings-btn"><i>&#8250;&#8250;</i>FLIGHT SETTINGS</button>
+        <button class="ir-btn primary" id="ir-resume"><i>&#8250;&#8250;</i>RESUME CONN</button>
+        <button class="ir-btn" id="ir-settings-btn"><i>&#8250;&#8250;</i>SHIP SETTINGS</button>
         <button class="ir-btn" id="ir-ctl-btn"><i>&#8250;&#8250;</i>CONTROLS</button>
         <div id="ir-pause-settings-host"></div>
         <div class="ir-controls hidden" id="ir-pause-controls" style="margin-top:16px">${controlRows}</div>
-        <div class="ir-foot"><b>ESC</b> RESUMES AND RE-ENGAGES THE STICK</div>
+        <div class="ir-foot"><b>ESC</b> RESUMES AND RE-ENGAGES THE CONN</div>
+      </div>
+    </div>
+  </div>
+  <div class="ir-layer hidden" id="ir-dock">
+    <div class="ir-panel" style="width:620px">
+      ${head('<b>&#9632;</b> STARFLEET COMMAND &middot; PORT AUTHORITY', 'SAFE')}
+      <div class="ir-body">
+        <div class="ir-eyebrow" id="ir-dock-kind">DEEP SPACE PORT</div>
+        <div class="ir-title" style="font-size:34px" id="ir-dock-name">SAFE HAVEN</div>
+        <div class="ir-sub" id="ir-dock-sub">NO HOSTILES &middot; REPAIR AND REQUISITION</div>
+        <div class="ir-rule"></div>
+        <div class="ir-wallet" id="ir-dock-wallet"><span>REQUISITION CREDITS</span><b id="ir-dock-credits">0</b></div>
+        <div class="ir-shop" id="ir-dock-shop"></div>
+        <div class="ir-rule"></div>
+        <button class="ir-btn primary" id="ir-dock-depart"><i>&#8250;&#8250;</i>DEPART &middot; JUMP TO NEXT SECTOR</button>
+        <button class="ir-btn" id="ir-dock-undock"><i>&#8250;&#8250;</i>RETURN TO CONN</button>
+        <div class="ir-foot"><b>ESC</b> RETURNS TO THE CONN &middot; SAFE HAVENS HAVE NO HOSTILES</div>
       </div>
     </div>
   </div>
   <div class="ir-layer hidden" id="ir-gameover">
     <div class="ir-panel" style="width:520px">
-      ${head('<b>&#9632;</b> FLIGHT TELEMETRY &middot; FINAL', 'LOSS')}
+      ${head('<b>&#9632;</b> STARFLEET COMMAND &middot; FINAL', 'LOST')}
       <div class="ir-body">
-        <div class="ir-title" style="font-size:32px">SHIP DESTROYED</div>
+        <div class="ir-title" style="font-size:32px">VESSEL LOST</div>
         <div class="ir-sub" id="ir-go-shipline">HULL INTEGRITY ZERO</div>
         <div class="ir-rule"></div>
         <div class="ir-stats">
           <span class="k">FINAL SCORE</span><span class="v big" id="ir-go-score">0</span>
           <span class="k">BEST SCORE<span class="ir-newrec hidden" id="ir-go-newrec">NEW RECORD</span></span><span class="v" id="ir-go-best">0</span>
-          <span class="k">WAVES CLEARED</span><span class="v" id="ir-go-waves">0</span>
-          <span class="k">SYSTEMS REACHED</span><span class="v" id="ir-go-systems">1</span>
-          <span class="k">HOSTILES DOWNED</span><span class="v" id="ir-go-kills">0</span>
+          <span class="k">ENGAGEMENTS WON</span><span class="v" id="ir-go-waves">0</span>
+          <span class="k">SECTORS VISITED</span><span class="v" id="ir-go-systems">1</span>
+          <span class="k">HOSTILES DESTROYED</span><span class="v" id="ir-go-kills">0</span>
         </div>
         <div class="ir-rule"></div>
         <button class="ir-btn primary" id="ir-restart"><i>&#8250;&#8250;</i>RELAUNCH</button>
@@ -351,9 +494,14 @@ export function initUI(G) {
   // root (visible during play, pointer-transparent, killed with the layer)
   const scoreHud = document.createElement('div');
   scoreHud.id = 'ir-hudscore';
-  scoreHud.innerHTML = '<div class="lab">SCORE</div><div class="val">0</div><div class="best"></div>';
+  scoreHud.innerHTML = '<div class="lab">STARFLEET SCORE</div><div class="val">0</div><div class="best"></div><div class="cred">REQ 0</div>';
   scoreHud.style.display = 'none';
   document.body.appendChild(scoreHud);
+
+  const dockPrompt = document.createElement('div');
+  dockPrompt.id = 'ir-dockprompt';
+  dockPrompt.style.display = 'none';
+  document.body.appendChild(dockPrompt);
 
   // settings block — one node, hosted by whichever overlay is open
   const settingsEl = document.createElement('div');
@@ -382,17 +530,63 @@ export function initUI(G) {
   const el = (id) => root.querySelector('#' + id);
   const startLayer = el('ir-start');
   const pauseLayer = el('ir-pause');
+  const dockLayer = el('ir-dock');
   const pauseControls = el('ir-pause-controls');
+  const dockShop = el('ir-dock-shop');
+  const dockCredits = el('ir-dock-credits');
+  const dockWallet = el('ir-dock-wallet');
+  const dockKind = el('ir-dock-kind');
+  const dockName = el('ir-dock-name');
+  const dockSub = el('ir-dock-sub');
   const sens = settingsEl.querySelector('#ir-sens');
   const sensVal = settingsEl.querySelector('#ir-sens-val');
   const segBtns = settingsEl.querySelectorAll('#ir-invert button');
 
+  const SHOP_ITEMS = [
+    {
+      id: 'hull',
+      name: 'HULL PATCH',
+      desc: () => 'RESTORE 40 HULL INTEGRITY',
+      cost: 120,
+      can: () => G.player.hull < 99.9,
+      buy: () => { G.player.hull = Math.min(100, G.player.hull + 40); },
+    },
+    {
+      id: 'shield',
+      name: 'SHIELD RECHARGE',
+      desc: () => 'RESTORE SHIELDS TO FULL',
+      cost: 80,
+      can: () => G.player.shield < 99.9,
+      buy: () => { G.player.shield = 100; },
+    },
+    {
+      id: 'torpedo',
+      name: 'TORPEDO SYSTEM',
+      desc: () => {
+        const next = Math.max(1.6, 3.2 - G.player.torpedoLevel * 0.4);
+        const dmg = Math.round((1 + G.player.torpedoLevel * 0.25) * 100);
+        return `RELOAD ${next.toFixed(1)}s \u00b7 WARHEAD ${dmg}%`;
+      },
+      cost: 320,
+      can: () => G.player.torpedoLevel < 4,
+      buy: () => G.flight.upgradeTorpedo(),
+    },
+    {
+      id: 'cannon',
+      name: 'PHASER BANKS',
+      desc: () => `MK ${G.player.cannonMk} \u2192 MK ${Math.min(4, G.player.cannonMk + 1)} \u00b7 DOUBLE HEAT ENDURANCE`,
+      cost: 320,
+      can: () => G.player.heatCap < 8,
+      buy: () => G.flight.grantCannonUpgrade(),
+    },
+  ];
+
   // in-fiction context line from the game's own procedural names
   el('ir-shipline').textContent =
-    `VESSEL ${G.names.ship} · SYSTEM ${G.names.system}`.toUpperCase();
+    `${G.names.ship} · ${G.names.system}`.toUpperCase();
   // persistent flight record (localStorage high score)
   const bootHS = readHighScore();
-  el('ir-bestline').textContent = bootHS > 0 ? `BEST SCORE ${fmt(bootHS)}` : 'NO FLIGHT RECORD ON FILE';
+  el('ir-bestline').textContent = bootHS > 0 ? `BEST STARFLEET RECORD ${fmt(bootHS)}` : 'NO FLIGHT RECORD ON FILE';
   const hudBest = scoreHud.querySelector('.best');
   const hudVal = scoreHud.querySelector('.val');
   if (bootHS > 0) hudBest.textContent = `BEST ${fmt(bootHS)}`;
@@ -404,6 +598,8 @@ export function initUI(G) {
   // readout was still painted over the game-over panel when a check looked
   // (hudGone: false) — a poll race dressed as a layout bug.
   let shownScore = -1;
+  let shownCredits = -1;
+  const hudCred = scoreHud.querySelector('.cred');
   const paintScoreHud = () => {
     const flying = G.uiState === 'running';
     if (scoreHud.style.display !== (flying ? 'block' : 'none')) {
@@ -412,8 +608,24 @@ export function initUI(G) {
     if (!flying) return;
     const sc = G.telemetryData.score;
     if (sc !== shownScore) { shownScore = sc; hudVal.textContent = fmt(sc); }
+    const cr = Math.max(0, Math.round(G.player.credits || 0));
+    if (cr !== shownCredits) { shownCredits = cr; hudCred.textContent = `REQ ${fmt(cr)}`; }
   };
-  setInterval(paintScoreHud, 150);
+
+  const paintDockPrompt = () => {
+    const safe = G.safeSystem && G.mode === 'space' && G.uiState === 'running';
+    if (!safe) { dockPrompt.style.display = 'none'; return; }
+    const station = G.station;
+    const near = station && station.canDock();
+    const dist = station ? station.nearest() : Infinity;
+    dockPrompt.style.display = 'block';
+    const label = station ? station.label : 'SAFE HAVEN';
+    const planet = station ? station.planetName : '';
+    dockPrompt.innerHTML = near
+      ? `<b>SAFE HAVEN</b><span><i>E</i> DOCK AT ${label} &middot; <i>J</i> JUMP</span>`
+      : `<b>FRIENDLY SPACE</b><span>${planet ? planet + ' &middot; ' : ''}NO HOSTILES &middot; <i>J</i> JUMP${dist < 3200 ? ' &middot; APPROACH TO DOCK' : ''}</span>`;
+  };
+  setInterval(() => { paintScoreHud(); paintDockPrompt(); }, 150);
 
   // ---------------- settings widgets ----------------
   function paintSettings() {
@@ -515,6 +727,84 @@ export function initUI(G) {
     tryLock();
   }
 
+  // ---------------- safe haven / port ----------------
+  function paintDock() {
+    if (!G.station) return;
+    const credits = Math.max(0, Math.round(G.player.credits || 0));
+    dockKind.textContent = G.station.label || 'SAFE HAVEN';
+    dockName.textContent = (G.station.planetName || 'FRIENDLY WORLD').toUpperCase();
+    dockSub.textContent = 'NO HOSTILES \u00b7 REPAIR AND REQUISITION';
+    dockCredits.textContent = fmt(credits);
+    dockWallet.classList.toggle('poor', credits < 80);
+    dockShop.innerHTML = SHOP_ITEMS.map((item) => {
+      const ready = item.can() && credits >= item.cost;
+      const max = !item.can();
+      const label = max ? (item.id === 'hull' || item.id === 'shield' ? 'FULL' : 'MAX') : `${fmt(item.cost)} CR`;
+      return `<div class="ir-item${ready ? '' : ' off'}" data-item="${item.id}">
+        <div class="ir-copy"><div class="ir-name">${item.name}</div><div class="ir-desc">${item.desc()}</div></div>
+        <button class="ir-buy" data-buy="${item.id}"${ready ? '' : ' disabled'}>${label}</button>
+      </div>`;
+    }).join('');
+    dockShop.querySelectorAll('[data-buy]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        buyDockItem(btn.dataset.buy);
+      });
+    });
+  }
+
+  function buyDockItem(id) {
+    const item = SHOP_ITEMS.find((it) => it.id === id);
+    if (!item || !item.can()) return false;
+    const credits = Math.max(0, Math.round(G.player.credits || 0));
+    if (credits < item.cost) return false;
+    if (item.buy() === false) return false;
+    G.player.credits = credits - item.cost;
+    G.telemetryData.credits = G.player.credits;
+    G.telemetryData.creditsSpent += item.cost;
+    paintDock();
+    paintScoreHud();
+    return true;
+  }
+
+  function openDock() {
+    if (G.uiState !== 'running' || !G.station || !G.station.canDock()) return false;
+    G.uiState = 'docked';
+    G.uiHold = true;
+    closeSettings();
+    pauseLayer.classList.add('hidden');
+    gameoverLayer.classList.add('hidden');
+    paintDock();
+    paintScoreHud();
+    dockPrompt.style.display = 'none';
+    dockLayer.classList.remove('hidden');
+    if (G.audio && G.audio.klaxonOff) G.audio.klaxonOff();
+    if (document.pointerLockElement === canvas && document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+    return true;
+  }
+
+  function undock() {
+    if (G.uiState !== 'docked') return;
+    G.uiState = 'running';
+    G.uiHold = false;
+    dockLayer.classList.add('hidden');
+    paintScoreHud();
+    paintDockPrompt();
+    tryLock();
+  }
+
+  function depart() {
+    if (G.uiState !== 'docked') return;
+    undock();
+    G.requestJump();
+  }
+
+  G.openDock = openDock;
+  G.undock = undock;
+  G.buyDockItem = buyDockItem;
+
   // ---------------- game over ----------------
   // main.js runs the destruction sequence (explosion + tumble) and calls
   // this when it freezes the frame. uiState is already 'gameover' by then.
@@ -523,6 +813,7 @@ export function initUI(G) {
   G.onGameOver = (stats) => {
     paintScoreHud(); // final earned value on the readout before it goes
     scoreHud.style.display = 'none'; // no poll race: the HUD leaves with the ship
+    dockPrompt.style.display = 'none';
     const prev = readHighScore();
     const isRecord = stats.score > prev;
     if (isRecord) writeHighScore(stats.score);
@@ -592,6 +883,8 @@ export function initUI(G) {
 
   el('ir-resume').addEventListener('click', (e) => { e.stopPropagation(); resume(); });
   el('ir-settings-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSettings('ir-pause-settings-host'); });
+  el('ir-dock-depart').addEventListener('click', (e) => { e.stopPropagation(); depart(); });
+  el('ir-dock-undock').addEventListener('click', (e) => { e.stopPropagation(); undock(); });
   el('ir-ctl-btn').addEventListener('click', (e) => {
     e.stopPropagation();
     const showing = pauseControls.classList.toggle('hidden');
@@ -608,6 +901,8 @@ export function initUI(G) {
       pause();
     } else if (G.uiState === 'paused' && performance.now() - pausedAt > 350) {
       resume();
+    } else if (G.uiState === 'docked') {
+      undock();
     }
   });
 

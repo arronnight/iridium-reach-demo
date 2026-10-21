@@ -268,7 +268,7 @@ const SHELL_BAKE_FRAG = /* glsl */`
     float gate = smoothstep(uGateLo, uGateHi, macro);
     float dens = clamp(base * 1.0 + 0.45, 0.0, 1.0) * bandW * gate;
     // torn ridged wisps (near shell): combed filaments, not cotton wool
-    float wisp = pow(1.0 - abs(snoise(dF * uFreq * 2.6 + w * 0.8 + uOff * 2.9)), 6.0);
+    float wisp = pow(clamp(1.0 - abs(snoise(dF * uFreq * 2.6 + w * 0.8 + uOff * 2.9)), 0.0, 1.0), 6.0);
     dens *= mix(1.0, wisp * 1.7, uWispMix);
     float a = clamp(dens, 0.0, 1.0);
     a = a * a * (3.0 - 2.0 * a) * uAlphaMax;
@@ -402,7 +402,7 @@ const PLANET_FRAG = /* glsl */`
     float hh = clamp(0.5 + 0.62 * h, 0.0, 1.0);
     vec3 alb = mix(uColLo, uColMid, smoothstep(0.30, 0.58, hh));
     // ridged mountain chains: bright, following the warp flow
-    float ridge = pow(1.0 - abs(snoise(dir * uNFreq * 3.1 + wq * 1.6 + uOff2 * 2.2)), 5.0)
+    float ridge = pow(clamp(1.0 - abs(snoise(dir * uNFreq * 3.1 + wq * 1.6 + uOff2 * 2.2)), 0.0, 1.0), 5.0)
                 * smoothstep(0.45, 0.78, hh);
     alb = mix(alb, uColHi, clamp(smoothstep(0.62, 0.92, hh) + ridge * 0.80, 0.0, 1.0));
     // moisture pulls hue subtly cooler (kept gentle — no grey washing)
@@ -421,8 +421,8 @@ const PLANET_FRAG = /* glsl */`
     // Craters at TWO scales, gated OUT of the maria: smooth dark seas beside
     // cratered highlands, so the surface is not one uniform bump frequency
     float mar = smoothstep(0.28, 0.72, 0.5 + 0.5 * fbm4(dir * 1.3 + uOff2 * 4.7));
-    float crn1 = abs(snoise(dir * uNFreq * 4.5 + uOff2 * 1.7));
-    float crn2 = abs(snoise(dir * uNFreq * 9.5 + uOff2 * 6.3));
+    float crn1 = clamp(abs(snoise(dir * uNFreq * 4.5 + uOff2 * 1.7)), 0.0, 1.0);
+    float crn2 = clamp(abs(snoise(dir * uNFreq * 9.5 + uOff2 * 6.3)), 0.0, 1.0);
     float crRim = (pow(1.0 - crn1, 10.0) + 0.55 * pow(1.0 - crn2, 14.0)) * (1.0 - 0.78 * mar);
     float pit = smoothstep(0.45, 0.85, 0.5 + 0.5 * snoise(dir * uNFreq * 3.5 + uOff2 * 9.1));
     vec3 albMoon = alb * mix(vec3(1.0), vec3(0.60, 0.58, 0.57), mar);
