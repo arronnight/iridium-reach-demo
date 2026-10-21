@@ -4325,7 +4325,7 @@ export function initCockpit(G) {
       if (G.mode !== 'planet') {
         ctx.fillStyle = WHITE_DIM;
         ctx.font = FONT('500', 22);
-        ctx.fillText('Sector Space', 24, 94);
+        ctx.fillText(`${G.names.shipClass} CLASS · ${G.names.quadrant} QUADRANT`, 24, 94);
       } else {
         // on the surface NMS surfaces environment data (r9 critic: the
         // one-word panel was 80% empty black) — quiet hazard readouts

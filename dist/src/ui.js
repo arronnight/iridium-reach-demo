@@ -47,7 +47,7 @@ export function initUI(G) {
 #ir-ui, #ir-ui * { margin: 0; padding: 0; box-sizing: border-box; }
 #ir-ui {
   position: fixed; inset: 0; z-index: 40;
-  font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: "Avenir Next", "Segoe UI", Helvetica, Arial, "DejaVu Sans Condensed", sans-serif;
   color: #f6ece0; -webkit-font-smoothing: antialiased; user-select: none;
 }
 /* scrim: warm, and light enough that the cockpit stays legible hardware */
@@ -107,6 +107,11 @@ export function initUI(G) {
   margin-top: 9px; text-align: center;
   font-size: 10px; font-weight: 600; letter-spacing: 0.24em; text-indent: 0.24em;
   color: rgba(246,236,224,0.52); text-transform: uppercase;
+}
+#ir-ui .ir-pad-hint {
+  margin-top: 11px; text-align: center;
+  font-size: 9px; font-weight: 600; letter-spacing: 0.13em; text-indent: 0.13em;
+  color: rgba(153,204,255,0.62); text-transform: uppercase;
 }
 #ir-ui .ir-rule {
   margin: 20px 0 18px; height: 1px;
@@ -252,7 +257,7 @@ export function initUI(G) {
   pointer-events: none; text-align: right; user-select: none;
   /* r9: same condensed geometric face as the repainted cockpit MFDs, so the
      score readout keeps one register with the in-world HUD */
-  font-family: "Avenir Next Condensed", "Arial Narrow", "Avenir Next", sans-serif;
+  font-family: "Avenir Next Condensed", "Arial Narrow", "Avenir Next", "DejaVu Sans Condensed", sans-serif;
   text-shadow: 0 0 10px rgba(0,0,0,0.55);
 }
 #ir-hudscore .lab {
@@ -278,7 +283,7 @@ export function initUI(G) {
 #ir-dockprompt {
   position: fixed; left: 50%; bottom: 42px; transform: translateX(-50%);
   z-index: 31; pointer-events: none; text-align: center; user-select: none;
-  font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", sans-serif;
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", "DejaVu Sans Condensed", sans-serif;
   color: #ffcc99; text-shadow: 0 0 14px rgba(0,0,0,0.9);
 }
 #ir-dockprompt b {
@@ -292,6 +297,61 @@ export function initUI(G) {
   text-transform: uppercase;
 }
 #ir-dockprompt span i { font-style: normal; color: #99ccff; }
+#ir-mission {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 30; width: clamp(310px, 34vw, 470px); pointer-events: none; user-select: none;
+  display: none; padding: 8px 15px 9px 18px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.78), rgba(0,0,0,0.46));
+  border-top: 2px solid var(--mc, #ff9c00);
+  border-left: 6px solid var(--mc, #ff9c00);
+  border-radius: 0 22px 0 0;
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", "DejaVu Sans Condensed", sans-serif;
+  color: #ffcc99; text-shadow: 0 0 12px rgba(0,0,0,0.85);
+}
+#ir-mission[data-type="combat"] { --mc: #ff9c00; }
+#ir-mission[data-type="diplomacy"] { --mc: #cc99cc; }
+#ir-mission[data-type="relief"] { --mc: #ffb15c; }
+#ir-mission[data-type="science"] { --mc: #66e6ff; }
+#ir-mission .m-head { display: flex; align-items: center; gap: 8px; }
+#ir-mission .m-kind {
+  padding: 2px 7px 2px 8px; background: var(--mc, #ff9c00); color: #000;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.20em; text-indent: 0.20em;
+  text-transform: uppercase;
+}
+#ir-mission .m-num { margin-left: auto; font-size: 8.5px; font-weight: 700; letter-spacing: 0.24em; color: #99ccff; }
+#ir-mission .m-title { margin-top: 5px; font-size: 17px; font-weight: 700; letter-spacing: 0.10em; color: #ffd7a3; text-transform: uppercase; }
+#ir-mission .m-obj { margin-top: 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #99ccff; text-transform: uppercase; }
+#ir-mission .m-bar { height: 3px; margin-top: 8px; background: rgba(255,255,255,0.12); overflow: hidden; }
+#ir-mission .m-bar i { display: block; width: 0; height: 100%; background: var(--mc, #ff9c00); box-shadow: 0 0 8px var(--mc, #ff9c00); transition: width 120ms linear; }
+#ir-mission .m-hint { margin-top: 5px; min-height: 12px; font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: rgba(255,204,153,0.72); text-transform: uppercase; }
+#ir-mission.mission-warning .m-hint { color: #ff6a4a; }
+#ir-mission.mission-complete { border-top-color: #9dffd6; border-left-color: #9dffd6; }
+#ir-mission.mission-complete .m-title { color: #d6ffed; }
+#ir-mission .m-foot {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.14);
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.16em; color: rgba(153,204,255,0.75);
+  text-transform: uppercase;
+}
+#ir-mission .m-reward { color: rgba(255,204,153,0.65); text-align: right; }
+#ir-missionprompt {
+  position: fixed; left: 50%; bottom: 58px; transform: translateX(-50%);
+  z-index: 31; pointer-events: none; text-align: center; user-select: none;
+  display: none;
+  font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", "DejaVu Sans Condensed", sans-serif;
+  color: #ffcc99; text-shadow: 0 0 14px rgba(0,0,0,0.9);
+}
+#ir-missionprompt b {
+  display: block; color: #99ccff; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.24em; text-indent: 0.24em; text-transform: uppercase;
+}
+#ir-missionprompt span {
+  display: block; margin-top: 5px; padding: 6px 15px;
+  border: 1px solid rgba(153,204,255,0.55); background: rgba(0,0,0,0.62);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.20em; text-indent: 0.20em;
+  text-transform: uppercase;
+}
+#ir-missionprompt span i { font-style: normal; color: #ff9c00; }
 #ir-ui #ir-dock { padding-top: 92px; }
 #ir-ui .ir-wallet {
   display: flex; align-items: baseline; justify-content: space-between;
@@ -308,6 +368,8 @@ export function initUI(G) {
   background: rgba(255,156,0,0.07);
 }
 #ir-ui .ir-item.off { opacity: 0.46; border-left-color: #555; }
+#ir-ui .ir-item.focus { outline: 2px solid #99ccff; outline-offset: 1px; background: rgba(153,204,255,0.12); }
+#ir-ui .ir-item.focus .ir-buy { background: #99ccff; color: #000; }
 #ir-ui .ir-item .ir-copy { flex: 1; min-width: 0; }
 #ir-ui .ir-item .ir-name {
   font-size: 13px; font-weight: 700; letter-spacing: 0.10em;
@@ -335,7 +397,7 @@ export function initUI(G) {
   // rails, peach type, lavender/blue data accents.
   const lcars = document.createElement('style');
   lcars.textContent = `
-#ir-ui { font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", sans-serif; color: #ffcc99; }
+#ir-ui { font-family: "Arial Narrow", "Avenir Next Condensed", "Avenir Next", "DejaVu Sans Condensed", sans-serif; color: #ffcc99; }
 #ir-ui .ir-layer { background: radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.62) 58%, rgba(0,0,0,0.82) 100%); }
 #ir-ui .ir-panel { background: #000; border: 0; border-radius: 0 48px 0 0; box-shadow: 0 0 0 2px #ff9c00, 0 0 42px rgba(0,0,0,0.85); clip-path: none; padding-bottom: 26px; overflow: hidden; }
 #ir-ui .ir-panel::before { content: ''; position: absolute; left: 0; top: 52px; bottom: 26px; width: 10px; background: #ff9c00; pointer-events: none; }
@@ -371,9 +433,9 @@ export function initUI(G) {
 #ir-ui .ir-seg button + button { border-left: 1px solid #333; }
 #ir-ui .ir-seg button.on { background: #99ccff; color: #000; box-shadow: none; }
 #ir-ui .ir-stats .k { color: #99ccff; }
-#ir-ui .ir-stats .v { color: #ffcc99; font-family: "Arial Narrow", "Avenir Next Condensed", sans-serif; }
+#ir-ui .ir-stats .v { color: #ffcc99; font-family: "Arial Narrow", "Avenir Next Condensed", "DejaVu Sans Condensed", sans-serif; }
 #ir-ui .ir-newrec { border: 0; background: #ff9c00; color: #000; border-radius: 0 10px 10px 0; }
-#ir-hudscore { font-family: "Arial Narrow", "Avenir Next Condensed", sans-serif; }
+#ir-hudscore { font-family: "Arial Narrow", "Avenir Next Condensed", "DejaVu Sans Condensed", sans-serif; }
 #ir-hudscore .lab { color: #ff9c00; }
 #ir-hudscore .val { color: #ffcc99; border-top-color: #ff9c00; }
 #ir-hudscore .best { color: #99ccff; }
@@ -411,7 +473,7 @@ export function initUI(G) {
     [key('SHIFT'), 'IMPULSE BOOST'],
     [key('SPACE') + key('CTRL'), 'BRAKE-TURN'],
     [key('F'), 'PHASERS'],
-    [key('E'), 'DOCK AT SAFE HAVEN'],
+    [key('E'), 'MISSION ACTION &middot; DOCK AT SAFE HAVEN'],
     [key('J'), 'JUMP FROM SAFE HAVEN'],
     [key('ESC'), 'PAUSE'],
   ].map(([k, a]) => `<div class="ir-keys">${k}</div><div class="ir-act">${a}</div>`).join('');
@@ -427,6 +489,7 @@ export function initUI(G) {
         <div class="ir-sub" id="ir-bestline" style="margin-top:5px"></div>
         <div class="ir-rule"></div>
         <div class="ir-controls">${controlRows}</div>
+        <div class="ir-pad-hint">XBOX PAD &middot; STICKS FLY &middot; RT/LT FIRE &middot; A INTERACT / DOCK &middot; Y JUMP &middot; START PAUSE</div>
         <div class="ir-rule"></div>
         <button class="ir-btn primary pulse" id="ir-fly"><i>&#8250;&#8250;</i>TAKE THE CONN</button>
         <button class="ir-btn" id="ir-start-set"><i>&#8250;&#8250;</i>SHIP SETTINGS</button>
@@ -447,7 +510,7 @@ export function initUI(G) {
         <button class="ir-btn" id="ir-ctl-btn"><i>&#8250;&#8250;</i>CONTROLS</button>
         <div id="ir-pause-settings-host"></div>
         <div class="ir-controls hidden" id="ir-pause-controls" style="margin-top:16px">${controlRows}</div>
-        <div class="ir-foot"><b>ESC</b> RESUMES AND RE-ENGAGES THE CONN</div>
+        <div class="ir-foot"><b>START</b> OR <b>ESC</b> RESUMES AND RE-ENGAGES THE CONN</div>
       </div>
     </div>
   </div>
@@ -464,7 +527,7 @@ export function initUI(G) {
         <div class="ir-rule"></div>
         <button class="ir-btn primary" id="ir-dock-depart"><i>&#8250;&#8250;</i>DEPART &middot; JUMP TO NEXT SECTOR</button>
         <button class="ir-btn" id="ir-dock-undock"><i>&#8250;&#8250;</i>RETURN TO CONN</button>
-        <div class="ir-foot"><b>ESC</b> RETURNS TO THE CONN &middot; SAFE HAVENS HAVE NO HOSTILES</div>
+        <div class="ir-foot"><b>A / ENTER</b> BUY &middot; <b>B / ESC</b> RETURN &middot; <b>Y</b> DEPART</div>
       </div>
     </div>
   </div>
@@ -484,7 +547,7 @@ export function initUI(G) {
         </div>
         <div class="ir-rule"></div>
         <button class="ir-btn primary" id="ir-restart"><i>&#8250;&#8250;</i>RELAUNCH</button>
-        <div class="ir-foot"><b>R</b> RELAUNCHES THE VESSEL</div>
+        <div class="ir-foot"><b>R</b> OR <b>A / START</b> RELAUNCHES THE VESSEL</div>
       </div>
     </div>
   </div>`;
@@ -502,6 +565,32 @@ export function initUI(G) {
   dockPrompt.id = 'ir-dockprompt';
   dockPrompt.style.display = 'none';
   document.body.appendChild(dockPrompt);
+
+  const missionCard = document.createElement('div');
+  missionCard.id = 'ir-mission';
+  missionCard.innerHTML = `
+    <div class="m-head"><span class="m-kind"></span><span class="m-num"></span></div>
+    <div class="m-title"></div>
+    <div class="m-obj"></div>
+    <div class="m-bar"><i></i></div>
+    <div class="m-hint"></div>
+    <div class="m-foot"><span class="m-range"></span><span class="m-reward"></span></div>`;
+  document.body.appendChild(missionCard);
+
+  const missionPrompt = document.createElement('div');
+  missionPrompt.id = 'ir-missionprompt';
+  missionPrompt.style.display = 'none';
+  document.body.appendChild(missionPrompt);
+
+  const mKind = missionCard.querySelector('.m-kind');
+  const mNum = missionCard.querySelector('.m-num');
+  const mTitle = missionCard.querySelector('.m-title');
+  const mObj = missionCard.querySelector('.m-obj');
+  const mBar = missionCard.querySelector('.m-bar i');
+  const mHint = missionCard.querySelector('.m-hint');
+  const mRange = missionCard.querySelector('.m-range');
+  const mReward = missionCard.querySelector('.m-reward');
+  const MISSION_KINDS = { combat: 'PATROL', diplomacy: 'DIPLOMACY', relief: 'RELIEF', science: 'SCIENCE' };
 
   // settings block — one node, hosted by whichever overlay is open
   const settingsEl = document.createElement('div');
@@ -572,18 +661,22 @@ export function initUI(G) {
       buy: () => G.flight.upgradeTorpedo(),
     },
     {
-      id: 'cannon',
-      name: 'PHASER BANKS',
-      desc: () => `MK ${G.player.cannonMk} \u2192 MK ${Math.min(4, G.player.cannonMk + 1)} \u00b7 DOUBLE HEAT ENDURANCE`,
+      id: 'phaser',
+      name: 'PHASER CALIBRATION',
+      desc: () => {
+        const now = Math.round(G.player.phaserDamageMul * 100);
+        const next = Math.round((G.player.phaserDamageMul + 0.15) * 100);
+        return `ARRAY OUTPUT ${now}% \u2192 ${next}% \u00b7 +15% DAMAGE`;
+      },
       cost: 320,
-      can: () => G.player.heatCap < 8,
-      buy: () => G.flight.grantCannonUpgrade(),
+      can: () => G.player.phaserCalibration < 4,
+      buy: () => G.flight.calibratePhasers(),
     },
   ];
 
   // in-fiction context line from the game's own procedural names
   el('ir-shipline').textContent =
-    `${G.names.ship} · ${G.names.system}`.toUpperCase();
+    `${G.names.ship} · ${G.names.shipClass} CLASS · ${G.names.system}`.toUpperCase();
   // persistent flight record (localStorage high score)
   const bootHS = readHighScore();
   el('ir-bestline').textContent = bootHS > 0 ? `BEST STARFLEET RECORD ${fmt(bootHS)}` : 'NO FLIGHT RECORD ON FILE';
@@ -615,6 +708,10 @@ export function initUI(G) {
   const paintDockPrompt = () => {
     const safe = G.safeSystem && G.mode === 'space' && G.uiState === 'running';
     if (!safe) { dockPrompt.style.display = 'none'; return; }
+    if (G.missions && G.missions.active && G.missions.canInteract) {
+      dockPrompt.style.display = 'none';
+      return;
+    }
     const station = G.station;
     const near = station && station.canDock();
     const dist = station ? station.nearest() : Infinity;
@@ -622,10 +719,38 @@ export function initUI(G) {
     const label = station ? station.label : 'SAFE HAVEN';
     const planet = station ? station.planetName : '';
     dockPrompt.innerHTML = near
-      ? `<b>SAFE HAVEN</b><span><i>E</i> DOCK AT ${label} &middot; <i>J</i> JUMP</span>`
-      : `<b>FRIENDLY SPACE</b><span>${planet ? planet + ' &middot; ' : ''}NO HOSTILES &middot; <i>J</i> JUMP${dist < 3200 ? ' &middot; APPROACH TO DOCK' : ''}</span>`;
+      ? `<b>SAFE HAVEN</b><span><i>E</i> / <i>A</i> DOCK AT ${label} &middot; <i>J</i> / <i>Y</i> JUMP</span>`
+      : `<b>FRIENDLY SPACE</b><span>${planet ? planet + ' &middot; ' : ''}NO HOSTILES &middot; <i>J</i> / <i>Y</i> JUMP${dist < 3200 ? ' &middot; APPROACH TO DOCK' : ''}</span>`;
   };
-  setInterval(() => { paintScoreHud(); paintDockPrompt(); }, 150);
+  function paintMission() {
+    const m = G.missions;
+    const flying = G.uiState === 'running' && G.mode === 'space' && m && m.active;
+    if (!flying) {
+      missionCard.style.display = 'none';
+      missionPrompt.style.display = 'none';
+      return;
+    }
+    missionCard.style.display = 'block';
+    missionCard.dataset.type = m.type || 'combat';
+    missionCard.classList.toggle('mission-complete', !!m.completed);
+    missionCard.classList.toggle('mission-warning', /WEAPONS HOT|TOO CLOSE|OUT OF/i.test(m.hint || ''));
+    mKind.textContent = MISSION_KINDS[m.type] || 'MISSION';
+    mNum.textContent = `MISSION ${String(m.sequence || 1).padStart(2, '0')}`;
+    mTitle.textContent = m.title || '';
+    mObj.textContent = m.objective || '';
+    mBar.style.width = `${Math.round((m.progress || 0) * 100)}%`;
+    mHint.textContent = m.hint || '';
+    mRange.textContent = m.progressLabel || (m.distance ? `RANGE ${m.distance}u` : '');
+    mReward.textContent = m.rewardText || '';
+    if (m.canInteract && !m.completed) {
+      missionPrompt.style.display = 'block';
+      missionPrompt.innerHTML = `<b>${m.targetName || 'CONTACT'}</b><span><i>E</i> / <i>A</i> ${m.prompt || 'INTERACT'}</span>`;
+    } else {
+      missionPrompt.style.display = 'none';
+    }
+  }
+
+  setInterval(() => { paintScoreHud(); paintDockPrompt(); paintMission(); }, 150);
 
   // ---------------- settings widgets ----------------
   function paintSettings() {
@@ -687,6 +812,7 @@ export function initUI(G) {
     startLayer.classList.add('hidden');
     closeSettings();
     paintScoreHud();  // readout up on the same frame as the launch
+    paintMission();
     G.post.whiteout = 1; // arrival-style fade into flight (game's own grammar)
     tryLock();           // audio unlocks itself off this same click (audio.js)
     // r15 game-start. THIS IS THE GESTURE THAT UNLOCKS AUDIO — the pointerdown
@@ -708,6 +834,7 @@ export function initUI(G) {
     pauseControls.classList.add('hidden');
     el('ir-ctl-btn').classList.remove('active');
     paintScoreHud();  // readout down with the sim, not 150ms later
+    paintMission();
     pauseLayer.classList.remove('hidden');
     // klaxon runs on a wall-clock interval — silence it while the sim holds
     if (G.audio && G.audio.klaxonOff) G.audio.klaxonOff();
@@ -723,11 +850,13 @@ export function initUI(G) {
     closeSettings();
     pauseLayer.classList.add('hidden');
     paintScoreHud();
+    paintMission();
     if (G.state === 'red-alert' && G.audio && G.audio.klaxonOn) G.audio.klaxonOn();
     tryLock();
   }
 
   // ---------------- safe haven / port ----------------
+  let dockFocus = 0;
   function paintDock() {
     if (!G.station) return;
     const credits = Math.max(0, Math.round(G.player.credits || 0));
@@ -736,11 +865,11 @@ export function initUI(G) {
     dockSub.textContent = 'NO HOSTILES \u00b7 REPAIR AND REQUISITION';
     dockCredits.textContent = fmt(credits);
     dockWallet.classList.toggle('poor', credits < 80);
-    dockShop.innerHTML = SHOP_ITEMS.map((item) => {
+    dockShop.innerHTML = SHOP_ITEMS.map((item, i) => {
       const ready = item.can() && credits >= item.cost;
       const max = !item.can();
       const label = max ? (item.id === 'hull' || item.id === 'shield' ? 'FULL' : 'MAX') : `${fmt(item.cost)} CR`;
-      return `<div class="ir-item${ready ? '' : ' off'}" data-item="${item.id}">
+      return `<div class="ir-item${ready ? '' : ' off'}${i === dockFocus ? ' focus' : ''}" data-item="${item.id}">
         <div class="ir-copy"><div class="ir-name">${item.name}</div><div class="ir-desc">${item.desc()}</div></div>
         <button class="ir-buy" data-buy="${item.id}"${ready ? '' : ' disabled'}>${label}</button>
       </div>`;
@@ -767,6 +896,19 @@ export function initUI(G) {
     return true;
   }
 
+  function moveDockFocus(delta) {
+    if (G.uiState !== 'docked') return false;
+    dockFocus = (dockFocus + delta + SHOP_ITEMS.length) % SHOP_ITEMS.length;
+    paintDock();
+    return true;
+  }
+
+  function buyFocused() {
+    if (G.uiState !== 'docked') return false;
+    const item = SHOP_ITEMS[dockFocus];
+    return item ? buyDockItem(item.id) : false;
+  }
+
   function openDock() {
     if (G.uiState !== 'running' || !G.station || !G.station.canDock()) return false;
     G.uiState = 'docked';
@@ -774,8 +916,10 @@ export function initUI(G) {
     closeSettings();
     pauseLayer.classList.add('hidden');
     gameoverLayer.classList.add('hidden');
+    dockFocus = 0;
     paintDock();
     paintScoreHud();
+    paintMission();
     dockPrompt.style.display = 'none';
     dockLayer.classList.remove('hidden');
     if (G.audio && G.audio.klaxonOff) G.audio.klaxonOff();
@@ -792,6 +936,7 @@ export function initUI(G) {
     dockLayer.classList.add('hidden');
     paintScoreHud();
     paintDockPrompt();
+    paintMission();
     tryLock();
   }
 
@@ -814,6 +959,8 @@ export function initUI(G) {
     paintScoreHud(); // final earned value on the readout before it goes
     scoreHud.style.display = 'none'; // no poll race: the HUD leaves with the ship
     dockPrompt.style.display = 'none';
+    missionCard.style.display = 'none';
+    missionPrompt.style.display = 'none';
     const prev = readHighScore();
     const isRecord = stats.score > prev;
     if (isRecord) writeHighScore(stats.score);
@@ -896,6 +1043,11 @@ export function initUI(G) {
   // catches it). In the menu Esc resumes, guarded so the browser's lock-exit
   // Esc cannot pause and resume within one press.
   window.addEventListener('keydown', (e) => {
+    if (G.uiState === 'docked') {
+      if (e.code === 'ArrowUp') { e.preventDefault(); moveDockFocus(-1); return; }
+      if (e.code === 'ArrowDown') { e.preventDefault(); moveDockFocus(1); return; }
+      if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); buyFocused(); return; }
+    }
     if (e.code !== 'Escape') return;
     if (G.uiState === 'running') {
       pause();
@@ -911,5 +1063,5 @@ export function initUI(G) {
     if (document.pointerLockElement !== canvas && G.uiState === 'running') pause();
   });
 
-  return { start, pause, resume };
+  return { start, pause, resume, restart: relaunch, undock, depart, moveDockFocus, buyFocused };
 }

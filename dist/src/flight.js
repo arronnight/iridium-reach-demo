@@ -1,18 +1,16 @@
 // flight.js — player 6DOF flight (pitch/yaw/roll, thrust, boost, brake-turn),
-// procedural chunky enemy fighters with pursuit/evade AI + shot leading,
-// wave escalation, photon-cannon heat model, shield/hull damage model with
-// red-alert trigger, and hit registration both ways.
+// faction-specific 2370s hostile hulls with pursuit/strafe/standoff AI and
+// shot leading, wave escalation, photon-cannon heat model, shield/hull damage
+// model with red-alert trigger, and hit registration both ways.
 import * as THREE from 'three';
+import { enemyProfileFor } from './lore.js';
 
 const BOLT_SPEED = 620;
 const ENEMY_BOLT_SPEED = 420;
 
-// hostile ship naming — the combat HUD shows the locked target's name over
-// its health readout; cockpit.js reads these via G.target.
-// Faction-functional grammar ("Klingon Bird-of-Prey", "Romulan Scout") for the
-// Star Trek reskin.
-const RAIDER_A = ['Klingon', 'Klingon', 'Romulan', 'Klingon', 'Romulan', 'Klingon'];
-const RAIDER_B = ['Bird-of-Prey', 'Attack Cruiser', 'Raider', 'Interceptor', 'Battlecruiser', 'Skiff'];
+// Hostile ship identity is resolved from the sector power in lore.js; the
+// combat HUD shows the locked target's name over its health readout, and
+// cockpit.js reads it via G.target.
 
 // ---------- enemy behavioural classes (r9, re-tuned r10) ----------
 // Distinct movement/damage signatures layered over the cosmetic hull
@@ -67,13 +65,6 @@ export const ENEMY_CLASSES = {
 // out-run. Duration/cooldown in seconds, trigger range in world units.
 const BURN = { range: 520, duration: 2.5, cooldown: 4.0 };
 const GUNSHIP_STANDOFF = 300;  // station radius it holds off the intercept point
-// class-consistent second name word (index reuses the seeded draw so rng
-// consumption is identical for every class — determinism guard)
-const CLASS_NAMES = {
-  interceptor: ['Scout', 'Bird-of-Prey', 'Interceptor'],
-  gunship: ['Battlecruiser', 'Warbird', 'Dreadnought'],
-};
-
 // ---------- DIFFICULTY CURVE (r9) ----------
 // sys = G.systemIndex (0-based); wave = global wave number (1-based).
 // Deliberate easy -> medium -> hard ramp. Target: a first-time player
@@ -154,6 +145,92 @@ function taperBlade(geo, axis, a0, a1, tipChord, sweepBack, tipThin) {
     else p.setX(i, p.getX(i) * (1 - t * (1 - tipThin)));
   }
   geo.computeVertexNormals();
+}
+
+
+// Merge the primitive parts into one indexed, three-material geometry. The
+// baked top-light and engine wash are what keep these procedural hulls from
+// reading as flat cutouts at combat distance.
+function assembleShipGeometry(parts, engines, wash = [0.13, 0.62, 0.50]) {
+  parts.sort((a, b) => a.mat - b.mat);
+  let total = 0;
+  for (const p of parts) total += p.geo.attributes.position.count;
+  const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3);
+  const colors = new Float32Array(total * 3);
+  const idx = [];
+  const groupStart = [0, 0, 0], groupCount = [0, 0, 0];
+  let vo = 0;
+  let prevMat = 0, groupFrom = 0;
+  for (const p of parts) {
+    if (p.mat !== prevMat) {
+      groupStart[prevMat] = groupFrom; groupCount[prevMat] = idx.length - groupFrom;
+      for (let mm = prevMat + 1; mm < p.mat; mm++) { groupStart[mm] = idx.length; groupCount[mm] = 0; }
+      groupFrom = idx.length; prevMat = p.mat;
+    }
+    pos.set(p.geo.attributes.position.array, vo * 3);
+    norm.set(p.geo.attributes.normal.array, vo * 3);
+    const n = p.geo.attributes.position.count;
+    for (let i = 0; i < n; i++) {
+      let f = 1;
+      let er = 0, eg = 0, eb = 0;
+      if (p.mat < 2) {
+        const ny = norm[(vo + i) * 3 + 1];
+        f = ny >= 0 ? 0.80 + 0.34 * ny : 0.80 + 0.30 * ny;
+        const px = pos[(vo + i) * 3], py = pos[(vo + i) * 3 + 1], pz = pos[(vo + i) * 3 + 2];
+        for (const e of engines) {
+          const dx = px - e.x, dy = py - e.y, dz = pz - e.z;
+          const d2 = dx * dx + dy * dy + dz * dz;
+          const w = Math.exp(-d2 * 0.055) * 0.85;
+          er += wash[0] * w; eg += wash[1] * w; eb += wash[2] * w;
+        }
+      }
+      colors[(vo + i) * 3] = p.color.r * f + er;
+      colors[(vo + i) * 3 + 1] = p.color.g * f + eg;
+      colors[(vo + i) * 3 + 2] = p.color.b * f + eb;
+    }
+    const pi = p.geo.index.array;
+    for (let i = 0; i < pi.length; i++) idx.push(pi[i] + vo);
+    vo += n;
+  }
+  groupStart[prevMat] = groupFrom; groupCount[prevMat] = idx.length - groupFrom;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  g.setIndex(idx);
+  for (let m = 0; m < 3; m++) g.addGroup(groupStart[m], groupCount[m], m);
+  g.computeBoundingSphere();
+  return g;
+}
+
+// Small primitive toolkit for the canon silhouettes below. All rotations are
+// applied before translation, so a wing can be raked about its root.
+function modelKit() {
+  const parts = [];
+  const add = (geo, color, mat = 0) => parts.push({ geo, color: new THREE.Color(color), mat });
+  const spin = (g, rx, ry, rz) => {
+    if (rx) g.rotateX(rx);
+    if (ry) g.rotateY(ry);
+    if (rz) g.rotateZ(rz);
+    return g;
+  };
+  const box = (w, h, d, c, x, y, z, mat = 0, rx = 0, ry = 0, rz = 0) => {
+    const g = spin(new THREE.BoxGeometry(w, h, d), rx, ry, rz);
+    g.translate(x, y, z); add(g, c, mat);
+  };
+  const cyl = (rt, rb, h, seg, c, x, y, z, mat = 0, rx = 0, ry = 0, rz = 0) => {
+    const g = spin(new THREE.CylinderGeometry(rt, rb, h, seg), rx, ry, rz);
+    g.translate(x, y, z); add(g, c, mat);
+  };
+  const sph = (r, c, x, y, z, sx = 1, sy = 1, sz = 1, mat = 0) => {
+    const g = new THREE.SphereGeometry(r, 8, 6);
+    g.scale(sx, sy, sz); g.translate(x, y, z); add(g, c, mat);
+  };
+  const cone = (r, h, seg, c, x, y, z, mat = 0, rx = 0, ry = 0, rz = 0) => {
+    const g = spin(new THREE.ConeGeometry(r, h, seg), rx, ry, rz);
+    g.translate(x, y, z); add(g, c, mat);
+  };
+  return { parts, add, box, cyl, sph, cone };
 }
 
 function buildFighterVariant(rng, v) {
@@ -373,67 +450,230 @@ function buildFighterVariant(rng, v) {
   rl(6.2, 0.42, 1.7, 0xcfe8ff, 0.13);
   if (podSide === 0) rl(0, -0.05, -14.0, 0xffd0a0, 0.14); // nose probe tip
 
-  // merge — parts ordered by material so each group is one contiguous range
-  parts.sort((a, b) => a.mat - b.mat);
-  let total = 0;
-  for (const p of parts) total += p.geo.attributes.position.count;
-  const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3);
-  const colors = new Float32Array(total * 3);
-  const idx = [];
-  const groupStart = [0, 0, 0], groupCount = [0, 0, 0];
-  let vo = 0;
-  let prevMat = 0, groupFrom = 0;
-  for (const p of parts) {
-    if (p.mat !== prevMat) {
-      groupStart[prevMat] = groupFrom; groupCount[prevMat] = idx.length - groupFrom;
-      // materials with no parts keep zero counts
-      for (let mm = prevMat + 1; mm < p.mat; mm++) { groupStart[mm] = idx.length; groupCount[mm] = 0; }
-      groupFrom = idx.length; prevMat = p.mat;
-    }
-    pos.set(p.geo.attributes.position.array, vo * 3);
-    norm.set(p.geo.attributes.normal.array, vo * 3);
-    const n = p.geo.attributes.position.count;
-    for (let i = 0; i < n; i++) {
-      // baked top-light: critic pass 1 called the hulls "one flat dark tone
-      // front to back — a paper cutout". Scale vertex colour by normal.y so
-      // upward faces carry a painted-light value and undersides sit in
-      // baked shade — the painterly NMS value split that survives flat
-      // ambient. Glow parts (mat 2) stay untouched.
-      let f = 1;
-      let er = 0, eg = 0, eb = 0;
-      if (p.mat < 2) {
-        const ny = norm[(vo + i) * 3 + 1];
-        f = ny >= 0 ? 0.80 + 0.34 * ny : 0.80 + 0.30 * ny; // 1.14 top .. 0.50 bottom
-        // r9 baked engine bounce (blind verdict: "no engine glow gradient"):
-        // rear-hull vertices near the twin nozzles carry a baked teal wash so
-        // the engines visibly LIGHT the surrounding plating at ANY distance —
-        // the shader wash (vfx.js) adds the live directional term on top.
-        const px = pos[(vo + i) * 3], py = pos[(vo + i) * 3 + 1], pz = pos[(vo + i) * 3 + 2];
-        for (const sx of [-1.8, 1.8]) {
-          const dx = px - sx, dy = py + 0.28, dz = pz - 6.9;
-          const d2 = dx * dx + dy * dy + dz * dz;
-          const w = Math.exp(-d2 * 0.055) * 0.85;
-          er += 0.13 * w; eg += 0.62 * w; eb += 0.50 * w;
-        }
-      }
-      colors[(vo + i) * 3] = p.color.r * f + er;
-      colors[(vo + i) * 3 + 1] = p.color.g * f + eg;
-      colors[(vo + i) * 3 + 2] = p.color.b * f + eb;
-    }
-    const pi = p.geo.index.array;
-    for (let i = 0; i < pi.length; i++) idx.push(pi[i] + vo);
-    vo += n;
-  }
-  groupStart[prevMat] = groupFrom; groupCount[prevMat] = idx.length - groupFrom;
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  g.setIndex(idx);
-  for (let m = 0; m < 3; m++) g.addGroup(groupStart[m], groupCount[m], m);
   // engine anchors: where the pooled halo sprites sit for this hull
-  return { geo: g, engines: [new THREE.Vector3(-1.8, -0.28, 7.0), new THREE.Vector3(1.8, -0.28, 7.0)] };
+  const engines = [new THREE.Vector3(-1.8, -0.28, 7.0), new THREE.Vector3(1.8, -0.28, 7.0)];
+  return { geo: assembleShipGeometry(parts, engines, [0.13, 0.62, 0.50]), engines };
 }
+
+
+// ---------- canon 2370s hostile silhouettes ----------
+// Each hull keeps the same three material groups as the mercenary fighter
+// (hull / painted panel / unlit glow), so the pooled mesh can swap geometry
+// on spawn without touching materials. Shapes are built from primitives:
+// silhouette first, then the faction's paint and engine light.
+
+function buildKlingonBrel() {
+  const k = modelKit(), { box, cyl, sph, add } = k;
+  const H = 0x555a38, D = 0x30352a, L = 0x72754b, R = 0x8c2f22, G = 0xff9a50;
+  // forward command bulb on a long neck — the Bird-of-Prey read
+  box(1.9, 1.1, 5.2, H, 0, 0, 1.1);
+  box(1.2, 0.8, 2.9, H, 0, 0.05, -2.2);
+  sph(0.85, H, 0, 0.12, -4.0, 1.35, 0.82, 1.75);
+  box(0.95, 0.45, 1.2, D, 0, 0.02, -5.25);
+  box(0.52, 0.42, 4.2, L, 0, 0.62, 0.1);
+  // drooped, swept wings; the tips carry disruptor pods
+  for (const s of [-1, 1]) {
+    const wing = new THREE.BoxGeometry(6.4, 0.24, 3.5);
+    taperBlade(wing, 'x', s > 0 ? -3.2 : 3.2, s > 0 ? 3.2 : -3.2, 0.46, 1.5, 0.78);
+    wing.translate(s * 3.2, 0, 0);
+    wing.rotateZ(-s * 0.36);
+    wing.rotateY(-s * 0.16);
+    wing.translate(0, -0.10, 0.9);
+    add(wing, H, 1);
+    box(0.72, 0.56, 2.4, D, s * 6.15, -1.25, 1.35, 1);
+    box(0.22, 0.22, 1.9, R, s * 5.55, -0.82, 0.65, 1, 0, 0, -s * 0.36);
+    // nacelle on a short pylon
+    box(1.1, 0.22, 1.5, H, s * 1.0, 0.38, 3.9, 0);
+    cyl(0.34, 0.44, 2.6, 7, D, s * 1.55, 0.55, 4.25, 0, Math.PI / 2);
+    const eng = new THREE.CircleGeometry(0.29, 10);
+    eng.translate(s * 1.55, 0.55, 5.58);
+    add(eng, G, 2);
+  }
+  // dorsal fin and wing-root livery
+  box(0.3, 1.9, 2.2, H, 0, 1.25, 3.2, 1, 0.35);
+  box(0.18, 0.5, 2.8, R, 0, 0.58, 1.2, 1);
+  const engines = [new THREE.Vector3(-1.55, 0.55, 5.7), new THREE.Vector3(1.55, 0.55, 5.7)];
+  return { geo: assembleShipGeometry(k.parts, engines, [0.50, 0.22, 0.08]), engines, glowScale: 3.8 };
+}
+
+function buildKlingonKtinga() {
+  const k = modelKit(), { box, cyl, sph, add } = k;
+  const H = 0x56603c, D = 0x30362b, L = 0x7a7d50, R = 0x8a3424, G = 0xffb060;
+  // long cylindrical battlecruiser body with the classic forward bulb
+  cyl(1.02, 1.14, 7.8, 8, H, 0, 0, 1.0, 0, Math.PI / 2);
+  box(0.92, 0.8, 2.9, H, 0, 0.05, -3.25);
+  sph(0.9, H, 0, 0.10, -4.9, 1.25, 0.78, 1.5);
+  box(0.7, 0.45, 1.3, D, 0, 0.02, -6.0);
+  box(0.55, 0.5, 5.2, L, 0, 0.72, 0.6);
+  // warp nacelles on broad pylons
+  for (const s of [-1, 1]) {
+    box(2.6, 0.28, 1.0, H, s * 1.25, 0.28, 3.2, 0);
+    cyl(0.52, 0.62, 5.4, 8, D, s * 2.15, 0.30, 3.4, 0, Math.PI / 2);
+    const eng = new THREE.CircleGeometry(0.45, 10);
+    eng.translate(s * 2.15, 0.30, 6.12);
+    add(eng, G, 2);
+    // forward wing blade and red pennant
+    const fin = new THREE.BoxGeometry(3.0, 0.2, 1.8);
+    taperBlade(fin, 'x', s > 0 ? -1.5 : 1.5, s > 0 ? 1.5 : -1.5, 0.5, 1.0, 0.7);
+    fin.translate(s * 1.5, -0.05, 0.4);
+    fin.rotateY(-s * 0.22);
+    add(fin, H, 1);
+    box(0.16, 0.4, 1.9, R, s * 1.3, 0.36, 0.9, 1);
+  }
+  box(0.34, 2.4, 2.8, H, 0, 1.3, 4.0, 1, 0.28);
+  const engines = [new THREE.Vector3(-2.15, 0.30, 6.25), new THREE.Vector3(2.15, 0.30, 6.25)];
+  return { geo: assembleShipGeometry(k.parts, engines, [0.50, 0.24, 0.08]), engines, glowScale: 3.4 };
+}
+
+function buildKlingonVorcha() {
+  const k = modelKit(), { box, cyl, sph, add } = k;
+  const H = 0x4f5836, D = 0x2c3328, L = 0x70784a, R = 0x8e3324, G = 0xffb060;
+  // central hull with the Vor'cha's forward mandibles and open gap
+  box(2.5, 1.25, 6.4, H, 0, 0, 0.6);
+  for (const s of [-1, 1]) {
+    box(1.15, 0.85, 4.6, H, s * 1.55, 0.05, -3.4, 0, 0, -s * 0.10);
+    box(0.75, 0.55, 1.8, D, s * 1.95, 0.02, -5.9, 0, 0, -s * 0.10);
+    box(0.22, 0.42, 2.8, R, s * 1.35, 0.55, -3.2, 1, 0, -s * 0.10);
+    // broad rear wing and nacelle
+    const wing = new THREE.BoxGeometry(5.6, 0.35, 2.8);
+    taperBlade(wing, 'x', s > 0 ? -2.8 : 2.8, s > 0 ? 2.8 : -2.8, 0.5, 1.1, 0.75);
+    wing.translate(s * 2.8, 0, 0);
+    wing.rotateY(-s * 0.18);
+    wing.translate(0, 0.05, 3.0);
+    add(wing, H, 1);
+    cyl(0.58, 0.70, 4.6, 8, D, s * 4.1, 0.28, 3.3, 0, Math.PI / 2);
+    const eng = new THREE.CircleGeometry(0.50, 10);
+    eng.translate(s * 4.1, 0.28, 5.62);
+    add(eng, G, 2);
+  }
+  box(0.38, 2.1, 2.6, H, 0, 1.25, 3.6, 1, 0.24);
+  box(1.3, 0.7, 2.3, D, 0, 0.85, 5.1, 0);
+  const engines = [new THREE.Vector3(-4.1, 0.28, 5.75), new THREE.Vector3(4.1, 0.28, 5.75)];
+  return { geo: assembleShipGeometry(k.parts, engines, [0.50, 0.26, 0.08]), engines, glowScale: 4.0 };
+}
+
+function buildRomulanScout() {
+  const k = modelKit(), { box, cyl, sph, add } = k;
+  const H = 0x46564a, D = 0x27322c, L = 0x687a68, R = 0x3f7a55, G = 0x9dff9a;
+  // flattened delta hull with forward prongs and swept wings
+  box(1.8, 0.72, 4.8, H, 0, 0, 0.4);
+  box(0.9, 0.42, 1.8, D, 0, 0.02, -2.7);
+  for (const s of [-1, 1]) {
+    box(0.55, 0.34, 2.7, H, s * 0.92, 0.02, -2.5, 0, 0, -s * 0.08);
+    box(0.18, 0.3, 2.1, R, s * 0.72, 0.30, -2.4, 1, 0, -s * 0.08);
+    const wing = new THREE.BoxGeometry(5.2, 0.18, 2.7);
+    taperBlade(wing, 'x', s > 0 ? -2.6 : 2.6, s > 0 ? 2.6 : -2.6, 0.42, 1.2, 0.72);
+    wing.translate(s * 2.6, 0, 0);
+    wing.rotateY(-s * 0.26);
+    wing.translate(0, -0.02, 1.3);
+    add(wing, H, 1);
+    box(0.34, 0.5, 2.2, D, s * 2.15, 0.10, 2.8, 0);
+    const eng = new THREE.CircleGeometry(0.30, 10);
+    eng.translate(s * 2.15, 0.10, 3.92);
+    add(eng, G, 2);
+  }
+  sph(0.55, L, 0, 0.36, -0.7, 1.1, 0.55, 1.7);
+  box(0.20, 0.55, 3.1, L, 0, 0.52, 0.2, 1);
+  const engines = [new THREE.Vector3(-2.15, 0.10, 4.02), new THREE.Vector3(2.15, 0.10, 4.02)];
+  return { geo: assembleShipGeometry(k.parts, engines, [0.18, 0.52, 0.26]), engines, glowScale: 3.4 };
+}
+
+function buildRomulanDderidex() {
+  const k = modelKit(), { box, cyl, sph, add } = k;
+  const H = 0x3e5146, D = 0x24312a, L = 0x647a68, R = 0x2f6a4a, G = 0x9dff9a;
+  // the twin-hull Warbird: a central head, two enormous side hulls, and the
+  // open gap between them. Deliberately the widest silhouette in the game.
+  box(3.0, 1.35, 4.6, H, 0, 0, -3.7);
+  box(1.55, 0.85, 1.8, D, 0, 0.02, -6.2);
+  box(0.30, 0.55, 3.0, L, 0, 0.82, -3.8, 1);
+  for (const s of [-1, 1]) {
+    // long curved side hull, raked forward toward the head
+    box(2.5, 1.35, 11.5, H, s * 5.55, 0, 0.9, 0, 0, -s * 0.10);
+    box(1.0, 0.8, 8.2, L, s * 6.7, 0.05, 1.2, 1, 0, -s * 0.10);
+    box(0.55, 0.6, 3.2, D, s * 5.0, -0.1, -5.1, 0, 0, -s * 0.10);
+    box(0.28, 0.55, 5.0, R, s * 6.2, 0.65, 2.2, 1, 0, -s * 0.10);
+    // engine pod at the rear of each hull
+    cyl(0.72, 0.86, 2.6, 8, D, s * 5.4, 0.1, 6.9, 0, Math.PI / 2);
+    const eng = new THREE.CircleGeometry(0.62, 12);
+    eng.translate(s * 5.4, 0.1, 8.22);
+    add(eng, G, 2);
+    // rear wing web tying the hulls to the centre
+    const web = new THREE.BoxGeometry(6.2, 0.35, 2.4);
+    taperBlade(web, 'x', s > 0 ? -3.1 : 3.1, s > 0 ? 3.1 : -3.1, 0.65, 1.0, 0.8);
+    web.translate(s * 3.1, 0, 0);
+    web.translate(0, 0, 5.7);
+    add(web, H, 1);
+  }
+  box(3.6, 1.1, 3.4, H, 0, 0.1, 6.4, 0);
+  box(2.0, 0.85, 4.0, L, 0, 0.72, 4.9, 1);
+  const engines = [new THREE.Vector3(-5.4, 0.1, 8.35), new THREE.Vector3(5.4, 0.1, 8.35)];
+  return { geo: assembleShipGeometry(k.parts, engines, [0.18, 0.55, 0.28]), engines, glowScale: 4.6 };
+}
+
+function buildCardassianHideki() {
+  const k = modelKit(), { box, cyl, sph, add } = k;
+  const H = 0x6b6452, D = 0x3a352b, L = 0x8a7d62, R = 0xa55a28, G = 0xffd08a;
+  // compact angular patrol ship: two forward prongs and a flat delta body
+  box(1.4, 0.85, 4.6, H, 0, 0, 0.4);
+  box(0.55, 0.42, 1.7, D, 0, 0.02, -2.5);
+  for (const s of [-1, 1]) {
+    box(0.62, 0.55, 2.8, H, s * 0.88, 0.02, -2.4, 0, 0, -s * 0.06);
+    box(0.22, 0.30, 1.9, R, s * 0.70, 0.42, -2.2, 1, 0, -s * 0.06);
+    const wing = new THREE.BoxGeometry(4.0, 0.20, 2.3);
+    taperBlade(wing, 'x', s > 0 ? -2.0 : 2.0, s > 0 ? 2.0 : -2.0, 0.45, 1.0, 0.7);
+    wing.translate(s * 2.0, 0, 0);
+    wing.rotateY(-s * 0.18);
+    wing.translate(0, 0.02, 1.6);
+    add(wing, H, 1);
+    cyl(0.32, 0.40, 2.4, 7, D, s * 1.55, 0.06, 3.2, 0, Math.PI / 2);
+    const eng = new THREE.CircleGeometry(0.27, 9);
+    eng.translate(s * 1.55, 0.06, 4.42);
+    add(eng, G, 2);
+  }
+  box(0.32, 0.55, 3.0, L, 0, 0.50, 0.7, 1);
+  box(0.20, 0.38, 1.8, R, 0, 0.78, 0.8, 1);
+  const engines = [new THREE.Vector3(-1.55, 0.06, 4.5), new THREE.Vector3(1.55, 0.06, 4.5)];
+  return { geo: assembleShipGeometry(k.parts, engines, [0.52, 0.28, 0.10]), engines, glowScale: 3.0 };
+}
+
+function buildCardassianGalor() {
+  const k = modelKit(), { box, cyl, sph, add } = k;
+  const H = 0x6f6754, D = 0x39342a, L = 0x91826a, R = 0xa65d2c, G = 0xffd08a;
+  // broad flat arrowhead: the Galor is all planform, with a raised centre
+  const hull = new THREE.CylinderGeometry(3.9, 2.2, 6.2, 4, 1);
+  hull.rotateX(Math.PI / 2);
+  hull.rotateZ(Math.PI / 4);
+  hull.scale(1.45, 0.22, 1);
+  hull.translate(0, 0, 0.4);
+  add(hull, H, 0);
+  box(2.1, 0.9, 4.8, H, 0, 0.42, 0.3, 0);
+  box(1.0, 0.55, 2.6, D, 0, 0.78, -2.0, 0);
+  for (const s of [-1, 1]) {
+    // forward side prongs and the raised tail pylons
+    box(1.0, 0.55, 3.2, H, s * 2.5, 0.12, -2.3, 0, 0, -s * 0.10);
+    box(0.55, 0.35, 1.7, D, s * 3.0, 0.08, -4.0, 0, 0, -s * 0.10);
+    box(0.20, 0.28, 2.4, R, s * 2.35, 0.46, -2.2, 1, 0, -s * 0.10);
+    box(1.4, 0.55, 3.0, L, s * 2.4, 0.30, 2.7, 1);
+    cyl(0.50, 0.62, 2.8, 8, D, s * 2.8, 0.28, 3.7, 0, Math.PI / 2);
+    const eng = new THREE.CircleGeometry(0.42, 10);
+    eng.translate(s * 2.8, 0.28, 5.12);
+    add(eng, G, 2);
+  }
+  box(0.55, 0.72, 4.4, L, 0, 0.82, 0.9, 1);
+  box(0.22, 0.42, 2.4, R, 0, 1.26, 0.8, 1);
+  const engines = [new THREE.Vector3(-2.8, 0.28, 5.24), new THREE.Vector3(2.8, 0.28, 5.24)];
+  return { geo: assembleShipGeometry(k.parts, engines, [0.52, 0.28, 0.10]), engines, glowScale: 3.4 };
+}
+
+const CANON_MODELS = {
+  'klingon-brel': buildKlingonBrel,
+  'klingon-ktinga': buildKlingonKtinga,
+  'klingon-vorcha': buildKlingonVorcha,
+  'romulan-scout': buildRomulanScout,
+  'romulan-dderidex': buildRomulanDderidex,
+  'cardassian-hideki': buildCardassianHideki,
+  'cardassian-galor': buildCardassianGalor,
+};
 
 function hpLabelCanvas() {
   const c = document.createElement('canvas');
@@ -472,6 +712,8 @@ export function initFlight(G) {
   player.torpedoMax = 3.2;
   player.torpedoLevel = 1;
   player.torpedoDamageMul = 1;
+  player.phaserCalibration = 0;
+  player.phaserDamageMul = 1;
   player.credits = 0;
 
   // ================= cannon heat upgrade (r15) =================
@@ -525,6 +767,15 @@ export function initFlight(G) {
     player.torpedoLevel++;
     player.torpedoMax = Math.max(1.6, TORPEDO_COOLDOWN - (player.torpedoLevel - 1) * 0.4);
     player.torpedoDamageMul = 1 + (player.torpedoLevel - 1) * 0.25;
+    G.telemetryData.torpedoLevel = player.torpedoLevel;
+    return true;
+  }
+
+  function calibratePhasers() {
+    if (player.phaserCalibration >= 4) return false;
+    player.phaserCalibration++;
+    player.phaserDamageMul = 1 + player.phaserCalibration * 0.15;
+    G.telemetryData.phaserDamageMul = player.phaserDamageMul;
     return true;
   }
 
@@ -705,6 +956,11 @@ export function initFlight(G) {
   for (let v = 0; v < FIGHTER_VARIANTS; v++) {
     fighterVariants.push(buildFighterVariant(G.rngFor('fighter-v' + v), v));
   }
+  // Canon hulls are built once and swapped onto pooled slots at spawn. They
+  // use the same three materials as the mercenary fighter, so the swap is a
+  // geometry assignment rather than a second render path.
+  const canonModels = {};
+  for (const key of Object.keys(CANON_MODELS)) canonModels[key] = CANON_MODELS[key]();
   // 3-material dart (see buildFighterVariant): dark metal hull with a hard sun
   // ping, matte painted green panels, and unlit hot engine/canopy parts.
   // r4 critics: fighters read as EMISSIVE GREEN BLOBS at pose distance — the
@@ -816,7 +1072,7 @@ export function initFlight(G) {
     if (bs) hpSprite.position.copy(bs.center); else hpSprite.position.set(0, 0, 0);
     mesh.add(hpSprite);
     enemies.push({
-      alive: false, mesh, hpSprite, hpTex, hpCanvas, glowL, glowR, haloMat,
+      alive: false, slot: i, mesh, hpSprite, hpTex, hpCanvas, glowL, glowR, haloMat,
       pos: mesh.position, quat: mesh.quaternion,
       vel: new THREE.Vector3(), hp: 100, maxHp: 100,
       state: 'pursuit', stateT: 0, fireT: 0, aimErr: 0.06,
@@ -999,13 +1255,23 @@ export function initFlight(G) {
     en.frozen = false;
     en.scriptAimOffset = null;
     en.cls = clsName;
-    // name: same two seeded draws for every class (determinism guard); the
-    // second word swaps to a class-consistent one via the SAME drawn index
-    const bIdx = (rng() * RAIDER_B.length) | 0;
-    const aIdx = (rng() * RAIDER_A.length) | 0;
-    const classWords = CLASS_NAMES[clsName];
-    const bWord = classWords ? classWords[bIdx % classWords.length] : RAIDER_B[bIdx];
-    en.name = RAIDER_A[aIdx] + ' ' + bWord;
+    // The sector's power determines which canon hull answers the distress
+    // call. Federation space in 2372 is the Klingon War; the Badlands/DMZ are
+    // Cardassian; Romulan and Klingon sectors field their own ships.
+    const profileSet = enemyProfileFor(G.names.power, G.names.system);
+    const profile = (profileSet && (profileSet[clsName] || profileSet.raider)) || {
+      model: null, name: 'Raider', bolt: 0x66ff55, engine: 0x70ffd8, standoff: 0,
+    };
+    // Keep the same two seeded draws every spawn (determinism guard) even
+    // though the lore profile now supplies the display name.
+    rng(); rng();
+    en.name = profile.name;
+    en.faction = G.names.power;
+    en.modelKey = profile.model || null;
+    en.standoff = profile.standoff ?? GUNSHIP_STANDOFF;
+    en.boltSpeed = profile.boltSpeed || ENEMY_BOLT_SPEED;
+    en.boltScale = profile.boltScale || null;
+    en.ordHitRadius = profile.hitRadius || 0;
     en.glowL.scale.set(4.5, 4.5, 1); // poses may enlarge; live spawns reset
     en.glowR.scale.set(4.5, 4.5, 1);
     en.pos.copy(pos);
@@ -1025,11 +1291,41 @@ export function initFlight(G) {
     en.fireRange = cls.fireRange || 750;
     en.burning = false;
     en.burnT = 1.0; // first siege burn is available a second after arrival
-    en.hitR = 14 * ((cls.scale[0] + cls.scale[1] + cls.scale[2]) / 3) / 2.6;
-    en.boltColor = clsName === 'gunship' ? 0xff7a22
-      : clsName === 'interceptor' ? 0x66ffb0
-      : 0x66ff55; // Klingon/Romulan disruptors run green
-    en.mesh.scale.set(cls.scale[0], cls.scale[1], cls.scale[2]);
+    const sc = profile.scale || cls.scale;
+    const avgS = (sc[0] + sc[1] + sc[2]) / 3;
+    const model = profile.model ? canonModels[profile.model] : null;
+    if (model) {
+      en.mesh.geometry = model.geo;
+      const bs = model.geo.boundingSphere;
+      if (bs) {
+        en.hpSprite.position.copy(bs.center);
+        const hpR = bs.radius * 2.05;
+        en.hpSprite.scale.set(hpR, hpR, 1);
+        en.hitR = bs.radius * avgS * 0.8;
+      } else {
+        en.hitR = 14 * avgS / 2.6;
+      }
+      en.glowL.position.copy(model.engines[0]);
+      en.glowR.position.copy(model.engines[1]);
+      en.glowL.scale.setScalar(model.glowScale || 4.5);
+      en.glowR.scale.setScalar(model.glowScale || 4.5);
+    } else {
+      const variant = fighterVariants[en.slot % FIGHTER_VARIANTS];
+      en.mesh.geometry = variant.geo;
+      const bs = variant.geo.boundingSphere;
+      if (bs) {
+        en.hpSprite.position.copy(bs.center);
+        const hpR = bs.radius * 2.05;
+        en.hpSprite.scale.set(hpR, hpR, 1);
+      }
+      en.glowL.position.copy(variant.engines[0]);
+      en.glowR.position.copy(variant.engines[1]);
+      en.hitR = 14 * avgS / 2.6;
+    }
+    en.boltColor = profile.bolt || (clsName === 'gunship' ? 0xff7a22
+      : clsName === 'interceptor' ? 0x66ffb0 : 0x66ff55);
+    en.haloMat.color.set(profile.engine || 0x70ffd8).multiplyScalar(1.6);
+    en.mesh.scale.set(sc[0], sc[1], sc[2]);
     en.state = 'pursuit';
     en.stateT = 0;
     en.fireT = (0.5 + rng() * 1.2) / cls.fireRate;
@@ -1206,7 +1502,8 @@ export function initFlight(G) {
       .addScaledVector(_tmp.set(0, 1, 0).applyQuaternion(player.quat), -2.2)
       .addScaledVector(_fwd, 3);
     const vel = _tmp.copy(dir).multiplyScalar(BOLT_SPEED).add(player.vel);
-    G.vfx.fireBolt(_muzzle, vel, 0xffc860, 'player', 1.7);
+    const bolt = G.vfx.fireBolt(_muzzle, vel, 0xffc860, 'player', 1.7);
+    if (bolt) bolt.dmg = 34 * player.phaserDamageMul;
     // r15 CANNON HEAT UPGRADE — the divisor is the whole mechanic.
     // HEAT_PER_SHOT is unchanged at 0.085 and so is every cooldown semantic
     // below (decay 0.28/s after a 0.35s idle, un-overheat at 0.35). What grows
@@ -1272,9 +1569,10 @@ export function initFlight(G) {
     _muzzle.copy(en.pos).addScaledVector(_tmp.set(0, 0, -1).applyQuaternion(en.quat), 6);
     _direct.copy(target).sub(_muzzle).normalize();
     const aim = _tmp2.copy(target);
+    const boltSpeed = en.boltSpeed || ENEMY_BOLT_SPEED;
     if (lead) {
       const dist = en.pos.distanceTo(target);
-      const tof = dist / ENEMY_BOLT_SPEED;
+      const tof = dist / boltSpeed;
       aim.addScaledVector(player.vel, tof);
     }
     const dir = aim.sub(_muzzle).normalize();
@@ -1291,9 +1589,10 @@ export function initFlight(G) {
     if (lead && dir.dot(_intercept) > COS_3DEG && _intercept.dot(_direct) < COS_1_5DEG) {
       G.telemetryData.enemyLeadShots++;
     }
-    const vel = _tmp.copy(dir).multiplyScalar(ENEMY_BOLT_SPEED);
-    // class-scaled beam: gunship slugs read heavy, interceptor needles light
-    const boltScale = en.cls === 'gunship' ? 3.2 : en.cls === 'interceptor' ? 1.6 : 2.2;
+    const vel = _tmp.copy(dir).multiplyScalar(boltSpeed);
+    // class-scaled beam: gunship slugs read heavy, interceptor needles light.
+    // Canon ordnance overrides the generic scale (the D'deridex plasma bolt).
+    const boltScale = en.boltScale || (en.cls === 'gunship' ? 3.2 : en.cls === 'interceptor' ? 1.6 : 2.2);
     const b = G.vfx.fireBolt(_muzzle, vel, en.boltColor, 'enemy', boltScale); // long beam read
     if (b) {
       b.dmg = en.dmg;         // per-class damage rides on the bolt (checkHits)
@@ -1305,7 +1604,7 @@ export function initFlight(G) {
       // ordnance is PROXIMITY-FUSED, an 11u burst radius, so what threatens is
       // its suppression volume rather than its marksmanship. Nothing new is
       // drawn for it: same bolt colour, same scale, same pooled sprite.
-      b.hitRadius = en.cls === 'gunship' ? 11 : 5;
+      b.hitRadius = en.ordHitRadius || (en.cls === 'gunship' ? 11 : 5);
     }
     G.telemetryData.enemyShotsFired++;
     if (wave.statEntry && wave.statEntry.clearedInS === null) wave.statEntry.enemyShotsInWave++;
@@ -1631,7 +1930,7 @@ export function initFlight(G) {
       }
       const tLead = THREE.MathUtils.clamp(distToPlayer / Math.max(40, maxSpeed), 0, 6);
       _predict.copy(player.pos).addScaledVector(player.vel, tLead);
-      _station.copy(en.orbitOffset).normalize().multiplyScalar(GUNSHIP_STANDOFF).add(_predict);
+      _station.copy(en.orbitOffset).normalize().multiplyScalar(en.standoff ?? GUNSHIP_STANDOFF).add(_predict);
       _desired.copy(_station).sub(en.pos);
       const d = _desired.length();
       // never coasts: a heavy that idles at station is the r9 turret again
@@ -1904,6 +2203,7 @@ export function initFlight(G) {
     // in the instrument and calling that a measurement.
     grantCannonUpgrade,
     upgradeTorpedo,
+    calibratePhasers,
     cannonHeat: { HEAT_PER_SHOT, HEAT_CAP_MAX },
     refreshHp: drawHp,
     aliveCount,

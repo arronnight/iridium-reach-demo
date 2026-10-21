@@ -138,6 +138,10 @@ export function initAudio(G) {
     shieldHit() { blip(180, 0.28, 'sine', 0.16, 60); noiseBurst(0.2, 0.1, 1200, 200); },
     explosion() { noiseBurst(0.9, 0.32, 900, 60); blip(70, 0.7, 'sine', 0.2, 28); },
     overheat() { blip(300, 0.4, 'sawtooth', 0.08, 90); },
+    chime() {
+      blip(660, 0.20, 'sine', 0.10, 990);
+      setTimeout(() => blip(990, 0.30, 'sine', 0.07, 1320), 125);
+    },
     warpSwell() {
       if (!unlocked()) return;
       try {
